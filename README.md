@@ -1,5 +1,4 @@
-以下是繁體中文版本
-簡體中文版本麻煩需要到博客園觀看 : [深入Dapper.NET源码 (文长) - 暐翰 - 博客园](https://www.cnblogs.com/ITWeiHan/p/11614704.html)
+簡體中文版本連結 : [深入Dapper.NET源码 (文长) - 暐翰 - 博客园](https://www.cnblogs.com/ITWeiHan/p/11614704.html)
 
 ---
 
