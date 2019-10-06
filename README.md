@@ -1,3 +1,10 @@
+以下是繁體中文版本
+簡體中文版本麻煩需要到博客園觀看 : [深入Dapper.NET源码 (文长) - 暐翰 - 博客园](https://www.cnblogs.com/ITWeiHan/p/11614704.html)
+
+---
+
+# 深入Dapper.NET源碼
+
 ## 目錄
 1. [前言、目錄、安裝環境  ](#page1)
 2. [Dynamic Query 原理 Part1 ](#page2)
