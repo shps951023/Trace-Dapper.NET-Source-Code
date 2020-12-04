@@ -234,7 +234,7 @@ In the first part, compare ADO.NET DataReader GetItem By Index with Dapper Stron
 
 With the logic, how to implement it, I use three techniques in order: `Reflection、Expression、Emit` implement three versions of the Query method from scratch to let readers understand gradually.
 
-### ADO.NET vs. Dapper
+**ADO.NET vs. Dapper**
 
 First use the following code to trace the Dapper Query logic
 
