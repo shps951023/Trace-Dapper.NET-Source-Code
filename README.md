@@ -701,7 +701,7 @@ First of all, there must be a concept, MSIL (CIL) is intended for JIT compiler, 
 
 In the actual environment development and use Emit, usually `c# code > Decompilation to IL > use Emit to build dynamic methods` , for example:
 
-\1. First create a simple printing example:
+1. First create a simple printing example:
 
 ```C#
 void SyaHello()
@@ -710,7 +710,7 @@ void SyaHello()
 }
 ```
 
-\2. Decompile and view IL
+2. Decompile and view IL
 
 ```C#
 SyaHello:
@@ -721,7 +721,7 @@ IL_000B:  nop
 IL_000C:  ret 
 ```
 
-\3. Use DynamicMethod + Emit to create a dynamic method
+3. Use DynamicMethod + Emit to create a dynamic method
 
 ```C#
 void Main()
@@ -1028,9 +1028,9 @@ public class Program
 
 Here you can find the Emit version, which has the advantage of:
 
-\1. Can do more detailed operations
+1. Can do more detailed operations
 
-\2. Because the detail granularity is small, the efficiency that can be optimized is better
+2. Because the detail granularity is small, the efficiency that can be optimized is better
 
 Disadvantages:
 
@@ -1560,12 +1560,12 @@ left join [User] T2 on T1.UserId = T2.ID
 
 The reason can be traced to Dapper's cutting algorithm
 
-\1. First, the field group by `reverse order`, the GetNextSplit method can be seen `DataReader Index`  from `large to small`.  
-![image](https://user-images.githubusercontent.com/12729184/101135549-eb67ef80-3646-11eb-8230-b70ae986b343.png)
+1. First, the field group by `reverse order`, the GetNextSplit method can be seen `DataReader Index`  from `large to small`.  
+   ![image](https://user-images.githubusercontent.com/12729184/101135549-eb67ef80-3646-11eb-8230-b70ae986b343.png)
 
-\2. Then process the Mapping Emit IL Func of the type in `reverse order`
+2. Then process the Mapping Emit IL Func of the type in `reverse order`
 
-\3. Finally, it is reversed to `positive order`, which is convenient for the use of Call Func corresponding to generics later.
+3. Finally, it is reversed to `positive order`, which is convenient for the use of Call Func corresponding to generics later.
 
 ![image](https://user-images.githubusercontent.com/12729184/101135698-1f431500-3647-11eb-8b24-9753f9b46065.png)
 
@@ -1714,9 +1714,9 @@ Then trace the TypeHandler source code logic, which needs to be traced in two pa
 
 ### The underlying logic of SetValue
 
-\1. AddTypeHandlerImpl method to manage the addition of cache  
+1. AddTypeHandlerImpl method to manage the addition of cache  
 
-\2. When creating a dynamic AddParameter method in the CreateParamInfoGenerator method Emit, if there is data in the TypeHandler cache of the Mapping type, Emit adds an action to call the SetValue method.
+2. When creating a dynamic AddParameter method in the CreateParamInfoGenerator method Emit, if there is data in the TypeHandler cache of the Mapping type, Emit adds an action to call the SetValue method.
 
 ```C#
 if (handler != null)
@@ -1725,13 +1725,13 @@ if (handler != null)
 }
 ```
 
-\3. LookupDbType will be used when calling the AddParameters method at Runtime to determine whether there is a custom TypeHandler
+3. LookupDbType will be used when calling the AddParameters method at Runtime to determine whether there is a custom TypeHandler
 
 ![image](https://user-images.githubusercontent.com/12729184/101142913-338c0f80-3651-11eb-8766-b577f1d9fcc1.png)
 
 ![image](https://user-images.githubusercontent.com/12729184/101142928-37b82d00-3651-11eb-9c08-e40cdcc42f60.png)
 
-\4. Then pass the created Parameter to the custom TypeHandler.SetValue method
+4. Then pass the created Parameter to the custom TypeHandler.SetValue method
 
 ![image](https://user-images.githubusercontent.com/12729184/101142987-4868a300-3651-11eb-99f4-b981dec8b97d.png)
 
@@ -1902,11 +1902,11 @@ I have compiled the Behavior table corresponding to each method here:
 
 First, you can see that each method uses `CommandBehavior.SequentialAccess`. The main function of this tag is to make the `DataReader read rows and columns sequentially without buffering`. `After reading a column, it will be deleted from memory`.  It has the following advantages:
 
-\1. Resources can be read in order to `avoid binary large resources from being read into memory at one time`, especially Blob or Clob will cooperate with GetBytes or GetChars methods to limit the buffer size, Microsoft officials also have special attention:
+1. Resources can be read in order to `avoid binary large resources from being read into memory at one time`, especially Blob or Clob will cooperate with GetBytes or GetChars methods to limit the buffer size, Microsoft officials also have special attention:
 
 ![image](https://user-images.githubusercontent.com/12729184/101143904-8619fb80-3652-11eb-9354-cfa40b7f5879.png)
 
-\2. Actual environment testing show it can `speed up query efficiency`. But it is `not` the default behavior of DataReader, the system `default is CommandBehavior.Default`
+2. Actual environment testing show it can `speed up query efficiency`. But it is `not` the default behavior of DataReader, the system `default is CommandBehavior.Default`
 
 ![image](https://user-images.githubusercontent.com/12729184/101144007-ae095f00-3652-11eb-887d-8ef58bb0d2c6.png)
 
@@ -2078,13 +2078,13 @@ It can be found that although the Age parameter is passed, the SQL string is not
 
 Why ADO.NET does not support IN parameterization, but Dapper does?
 
-\1. Check whether the attribute of the parameter is a subclass of IEnumerable 
+1. Check whether the attribute of the parameter is a subclass of IEnumerable 
 
-\2. If yes, use the parameter name + regular format to find the parameter string in SQL `(regular format: ([?@:]Parameter name)(?!\w)(\s+(?i)unknown(?- i))?)`
+2. If yes, use the parameter name + regular format to find the parameter string in SQL `(regular format: ([?@:]Parameter name)(?!\w)(\s+(?i)unknown(?- i))?)`
 
-\3. Replace the found string with `()` + multiple `attribute names + serial number`
+3. Replace the found string with `()` + multiple `attribute names + serial number`
 
-\4. CreateParameter> SetValue in order of serial number
+4. CreateParameter> SetValue in order of serial number
 
 Key Code part
 
@@ -2364,19 +2364,19 @@ This is a characteristic feature of Dapper, which simplifies the operations betw
 
 Why it is so convenient, the following is the underlying logic:
 
-\1. Confirm whether it is a collection parameter
+1. Confirm whether it is a collection parameter
 
 ![image](https://user-images.githubusercontent.com/12729184/101189227-b8971900-3691-11eb-9f47-34a374eb4694.png)
 
-\2. Create a `common DbCommand` to provide foreach iterative call to avoid repeated create and waste of resources
+2. Create a `common DbCommand` to provide foreach iterative call to avoid repeated create and waste of resources
 
 ![image](https://user-images.githubusercontent.com/12729184/101189341-debcb900-3691-11eb-8c70-efb0eab94782.png)
 
-\3. If it is a set of parameters, create an Emit IL dynamic method and put it in the cache for use
+3. If it is a set of parameters, create an Emit IL dynamic method and put it in the cache for use
 
 ![image](https://user-images.githubusercontent.com/12729184/101189402-f8f69700-3691-11eb-949a-c6bf22ac6846.png)
 
-\4. The dynamic method logic is `CreateParameter> Assign Parameter> Use Parameters.Add to add a new parameter`. The following is the C# code converted by Emit IL:
+4. The dynamic method logic is `CreateParameter> Assign Parameter> Use Parameters.Add to add a new parameter`. The following is the C# code converted by Emit IL:
 
 ```C#
   public static void ParamReader(IDbCommand P_0, object P_1)
@@ -2392,7 +2392,7 @@ Why it is so convenient, the following is the underlying logic:
   }
 ```
 
-\5. `foreach` the set of parameters> except for the first time, clear the DbCommand parameters in each iteration> re-call the `same` dynamic method to add parameters> reqeust SQL query
+5. `foreach` the set of parameters> except for the first time, clear the DbCommand parameters in each iteration> re-call the `same` dynamic method to add parameters> reqeust SQL query
 
 The implementation method is simple and clear, and the details consider sharing resources to avoid waste `(eg sharing the same DbCommand, Func)`, but in the case of a large number of execution pursuit efficiency requirements, you need to pay special attention to this method `every time you run to send a request to the database`, the efficiency will be the network transmission is slow, so this function is called `"multiple execution" instead of "batch execution"`.
 
@@ -2483,9 +2483,7 @@ private static T Parse<T>(object value)
 
 Use Convert.ChangeType to convert to bool: `"0=false, non-0=true"` logic, so that the system can simply convert to bool value.
 
-#### Note
-
-Don't replace by QueryFirstOrDefault, because it requires additional Null check in SQL, otherwise "NullReferenceException" will show.
+Note: Don't replace by QueryFirstOrDefault, because it requires additional Null check in SQL, otherwise "NullReferenceException" will show.
 
 The reason is that the two Parse implementations are different, and the QueryFirstOrDefault check the result to be null.
 
