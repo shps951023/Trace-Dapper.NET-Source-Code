@@ -1,11 +1,5 @@
-Trace-Dapper.NET-Source-Code
+Trace Dapper.NET Source Code
 ----
-
-
-## Table of contents
-
-1. [Introduction & Installation Environment](#page1)
-2. 
 
 ## Introduction <a name="page1"></a>
 
