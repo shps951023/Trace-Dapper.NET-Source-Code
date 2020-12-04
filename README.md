@@ -1,7 +1,7 @@
 Trace Dapper.NET Source Code
 ----
 
-English : [https://github.com/shps951023/Trace-Dapper.NET-Source-Code/edit/master/README.md](https://github.com/shps951023/Trace-Dapper.NET-Source-Code/edit/master/README.md)  
+English : [https://github.com/shps951023/Trace-Dapper.NET-Source-Code](https://github.com/shps951023/Trace-Dapper.NET-Source-Code)  
 Traditional Chinese : [https://github.com/shps951023/Trace-Dapper.NET-Source-Code/blob/master/zh_tw.md](https://github.com/shps951023/Trace-Dapper.NET-Source-Code/blob/master/zh_tw.md)  
 Simplified Chinese : [https://www.cnblogs.com/ITWeiHan/p/11614704.html](https://www.cnblogs.com/ITWeiHan/p/11614704.html)  
 
@@ -1807,7 +1807,7 @@ Finally, the C# code converted from IL
 It can be found that the generated Emit IL will get our implemented TypeHandler from TypeHandlerCache, and then `call the implemented SetValue method` to run the set logic, and TypeHandlerCache uses `generic type` to save different handlers in `Singleton mode` according to different generics. This has the following advantages :
 
 1.  Same handler can be obtained to avoid repeated creation of objects
-2. Because it is a generic type, reflection actions can be avoided when the handler is taken, and `efficiency can be improved`
+2.  Because it is a generic type, reflection actions can be avoided when the handler is taken, and `efficiency can be improved`
 
 ![image](https://user-images.githubusercontent.com/12729184/101143328-b1501b00-3651-11eb-92aa-15cfde21e7c3.png)
 ![image](https://user-images.githubusercontent.com/12729184/101143332-b319de80-3651-11eb-8291-90b6206bd82b.png)
@@ -1950,7 +1950,7 @@ I have compiled the Behavior table corresponding to each method here:
 
 ---
 
-#### SequentialAccess, SingleResult optimization logic
+### SequentialAccess, SingleResult optimization logic
 
 First, you can see that each method uses `CommandBehavior.SequentialAccess`. The main function of this tag is to make the `DataReader read rows and columns sequentially without buffering`. `After reading a column, it will be deleted from memory`.  It has the following advantages:
 
@@ -1975,7 +1975,7 @@ There is also a detailed processing of this paragraph. Looking at the source cod
 
 Earlier, I specifically posted an Issue ([Link #1210](https://github.com/StackExchange/Dapper/issues/1210)) to ask author, here is the answer: `mainly to avoid ignoring errors, such as when the DataReader is closed early`.
 
-#### QueryFirst with SingleRow
+### QueryFirst with SingleRow
 
 Sometimes we will encounter a situation where `select top 1` knows that only one row of data will be read. At this time, `QueryFirst` can be used. It uses `CommandBehavior.SingleRow` to avoid wasting resources and only read one row of data.
 
@@ -1983,7 +1983,7 @@ In addition, it can be found that in addition to `while (reader.NextResult()){}`
 
 ![image](https://user-images.githubusercontent.com/12729184/101144554-72bb6000-3653-11eb-9034-2fdfec1687ec.png)
 
-#### Differences with QuerySingle
+### Differences with QuerySingle
 
 The difference between the two is that QuerySingle does not use CommandBehavior.SingleRow. As for why it is not used, it is because multiple rows of data are needed to `determine whether the conditions are not met and an Exception is thrown to inform the user`.
 
