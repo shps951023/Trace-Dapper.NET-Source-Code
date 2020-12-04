@@ -3,7 +3,7 @@ Trace Dapper.NET Source Code
 
 ## Introduction <a name="page1"></a>
 
-After years of promotion by Industry Veterans and StackOverflow, “Dapper with Entity Framework” is a powerful combination that meets the needs of “safe, convenient, efficient, maintainable” .
+After years of promotion by Industry Veterans and StackOverflow, “Dapper with Entity Framework” is a powerful combination that deal the needs of “safe, convenient, efficient, maintainable” .
 
 But the current network articles, although there are many articles on Dapper but stay on how to use, no one systematic explanation of the source code logic. So with this article “Trace Dapper Source Code” want to take you into the Dapper code, to understand the details of the design, efficient principles, and learn up practical application in the work.
 
@@ -28,7 +28,7 @@ My Personal Environment
 
 ## Dynamic Query
 
-With Dapper dynamic Query, you can save time in modifying class attributes in the early stages of development because the table structure is still `in tuning phase`, or it isn’t worth the extra effort to declare class lightweight requirements. 
+With Dapper dynamic Query, you can save time in modifying class attributes in the early stages of development because the table structure is still `in fixing`, or it isn’t worth the extra effort to declare class lightweight requirements. 
 
 Use POCO generator to quickly generate `
 Strong type` Class to strongly maintain when the table is stable, e.g [PocoClassGenerator](https://github.com/shps951023/PocoClassGenerator).
@@ -1100,87 +1100,1419 @@ With this concept, the previous Emit version is modified into a simple Cache Dem
 ```C#
 public class Identity
 {
-  public string sql { get; set; }
-  public CommandType? commandType { get; set; }
-  public string connectionString { get; set; }
-  public Type type { get; set; }
-  public Type parametersType { get; set; }
-  public Identity(string sql, CommandType? commandType, string connectionString, Type type, Type parametersType)
-  {
-    this.sql = sql;
-    this.commandType = commandType;
-    this.connectionString = connectionString;
-    this.type = type;
-    this.parametersType = parametersType;
-    unchecked
-    {
-      hashCode = 17; // we *know* we are using this in a dictionary, so pre-compute this
-      hashCode = (hashCode * 23) + commandType.GetHashCode();
-      hashCode = (hashCode * 23) + (sql?.GetHashCode() ?? 0);
-      hashCode = (hashCode * 23) + (type?.GetHashCode() ?? 0);
-      hashCode = (hashCode * 23) + (connectionString == null ? 0 : StringComparer.Ordinal.GetHashCode(connectionString));
-      hashCode = (hashCode * 23) + (parametersType?.GetHashCode() ?? 0);
-    }
-  }
+	public string sql { get; set; }
+	public CommandType? commandType { get; set; }
+	public string connectionString { get; set; }
+	public Type type { get; set; }
+	public Type parametersType { get; set; }
+	public Identity(string sql, CommandType? commandType, string connectionString, Type type, Type parametersType)
+	{
+		this.sql = sql;
+		this.commandType = commandType;
+		this.connectionString = connectionString;
+		this.type = type;
+		this.parametersType = parametersType;
+		unchecked
+		{
+			hashCode = 17; // we *know* we are using this in a dictionary, so pre-compute this
+			hashCode = (hashCode * 23) + commandType.GetHashCode();
+			hashCode = (hashCode * 23) + (sql?.GetHashCode() ?? 0);
+			hashCode = (hashCode * 23) + (type?.GetHashCode() ?? 0);
+			hashCode = (hashCode * 23) + (connectionString == null ? 0 : StringComparer.Ordinal.GetHashCode(connectionString));
+			hashCode = (hashCode * 23) + (parametersType?.GetHashCode() ?? 0);
+		}
+	}
 
-  public readonly int hashCode;
-  public override int GetHashCode() => hashCode;
-  
-  public override bool Equals(object obj) => Equals(obj as Identity);
-  public bool Equals(Identity other)
-  {
-    if (ReferenceEquals(this, other)) return true;
-    if (ReferenceEquals(other, null)) return false;
+	public readonly int hashCode;
+	public override int GetHashCode() => hashCode;
 
-    return type == other.type
-      && sql == other.sql
-      && commandType == other.commandType
-      && StringComparer.Ordinal.Equals(connectionString, other.connectionString)
-      && parametersType == other.parametersType;
-  }
+	public override bool Equals(object obj) => Equals(obj as Identity);
+	public bool Equals(Identity other)
+	{
+		if (ReferenceEquals(this, other)) return true;
+		if (ReferenceEquals(other, null)) return false;
+
+		return type == other.type
+		  && sql == other.sql
+		  && commandType == other.commandType
+		  && StringComparer.Ordinal.Equals(connectionString, other.connectionString)
+		  && parametersType == other.parametersType;
+	}
 }
 
 public static class DemoExtension
 {
-  private static readonly Dictionary<Identity, Func<DbDataReader, object>> readers = new Dictionary<Identity, Func<DbDataReader, object>>();
+	private static readonly Dictionary<Identity, Func<DbDataReader, object>> readers = new Dictionary<Identity, Func<DbDataReader, object>>();
 
-  public static IEnumerable<T> Query<T>(this IDbConnection cnn, string sql,object param=null) where T : new()
-  {
-    using (var command = cnn.CreateCommand())
-    {
-      command.CommandText = sql;
-      using (var reader = command.ExecuteReader())
-      {
-        var identity = new Identity(command.CommandText, command.CommandType, cnn.ConnectionString, typeof(T), param?.GetType());
-        
-        // 2. If the cache has data, use it, and if there is no data, create a method dynamically and save it in the cache 
-        if ( ! Readers . TryGetValue ( identity , out  Func < DbDataReader , object > func ))
-        {
-          //The dynamic creation method 
-          func  =  GetTypeDeserializerImpl ( typeof ( T ), reader );
-           readers [ identity ] =  func ;
-           Console . WriteLine ( " No cache, create a dynamic method and put it in the cache " );
-        } else {
-           Console . WriteLine ( " Use cache " );
-        }
+	public static IEnumerable<T> Query<T>(this IDbConnection cnn, string sql, object param = null) where T : new()
+	{
+		using (var command = cnn.CreateCommand())
+		{
+			command.CommandText = sql;
+			using (var reader = command.ExecuteReader())
+			{
+				var identity = new Identity(command.CommandText, command.CommandType, cnn.ConnectionString, typeof(T), param?.GetType());
+
+				// 2. If the cache has data, use it, and if there is no data, create a method dynamically and save it in the cache 
+				if (!readers.TryGetValue(identity, out Func<DbDataReader, object> func))
+				{
+					//The dynamic creation method 
+					func = GetTypeDeserializerImpl(typeof(T), reader);
+					readers[identity] = func;
+					Console.WriteLine(" No cache, create a dynamic method and put it in the cache ");
+				}
+				else
+				{
+					Console.WriteLine(" Use cache ");
+				}
 
 
-        // 3. Call the generated method by reader, read the data and return 
-        while ( reader . Read ())
-        {
-          var result = func(reader as DbDataReader);
-          yield return result is T ? (T)result : default(T);
-        }
-      }
+				// 3. Call the generated method by reader, read the data and return 
+				while (reader.Read())
+				{
+					var result = func(reader as DbDataReader);
+					yield return result is T ? (T)result : default(T);
+				}
+			}
 
-    }
-  }
+		}
+	}
 
-  private static Func<DbDataReader, object> GetTypeDeserializerImpl(Type type, IDataReader reader, int startBound = 0, int length = -1, bool returnNullIfFirstMissing = false)
-  {
-    // .. slightly
-  }
+	private static Func<DbDataReader, object> GetTypeDeserializerImpl(Type type, IDataReader reader, int startBound = 0, int length = -1, bool returnNullIfFirstMissing = false)
+	{
+		// ..
+	}
 }
 ```
 
 ![image](https://user-images.githubusercontent.com/12729184/101130013-a5f2f480-363d-11eb-8e1d-1b9851c6e5b2.png)
+
+## The splicing method of wrong SQL strings will cause slow efficiency and memory leaks
+
+Here's an important concept used by Dapper. Its `SQL string` is one of the important key values to cache. If different SQL strings are used, Dapper will create new dynamic methods and caches for this, so even if you use StringBuilder improperly `can also cause slow query & memory leaks` .
+
+![image](https://user-images.githubusercontent.com/12729184/101131153-c8860d00-363f-11eb-9553-f50baafbb2a7.png)
+
+
+
+Why the SQL string is used as one of keys, instead of simply using the Handle of the Mapping type, one of the reasons is `order of query column ` . As mentioned earlier, Dapper uses the `「result convert to code」` method to create a dynamic method, which means that the order and data must be `fixed` , avoid using the same set of dynamic methods with different SQL Select column order, there will be a `A column value to b column` wrong value problem.
+
+The most direct solution is to establish a different dynamic method for each different SQL string and save it in a different cache.
+
+For example, the following code is just a simple query action, but the number of Dapper Caches has reached 999999, such as Gif animation display
+
+```C#
+using (var cn = new SqlConnection(@"connectionString"))
+{
+    for ( int  i  = 0; i  <  999999 ; i ++ )
+    {
+        var guid = Guid.NewGuid();
+        for (int i2 = 0; i2 < 2; i2++)
+        {
+            var result = cn.Query<User>($"select '{guid}' ").First();
+        }  
+    }
+}
+```
+
+![image](https://user-images.githubusercontent.com/12729184/101131682-aa6cdc80-3640-11eb-9b71-697496d29b3b.png)
+
+To avoid this problem, you only need to maintain a principle `Reuse SQL string` , and the simplest way is `parametrization` , for example: Change the above code to the following code, the number of caches is reduced to `1` , to achieve the purpose of reuse:
+
+```C#
+using (var cn = new SqlConnection(@"connectionString"))
+{
+    for ( int  i  = 0; i  <  999999 ; i ++ )
+    {
+        var guid = Guid.NewGuid();
+        for (int i2 = 0; i2 < 2; i2++)
+        {
+            var result = cn.Query<User>($"select @guid ",new { guid}).First();
+        }  
+    }
+}
+```
+
+![image](https://user-images.githubusercontent.com/12729184/101131840-e9029700-3640-11eb-8f95-a4d317dc3842.png)
+
+## Dapper SQL correct string contacting method: Literal Replacement
+
+If there is a need to splice SQL strings, for example: Sometimes it is more efficient to use string contacting than not to use parameterization, especially if there are only a few  `fixed values` .
+
+At this time, Dapper can use the `Literal Replacements` function, how to use it: `{=Attribute_Name}` replace the value string to be contacted, and save the value in the Parameter, for example:
+
+```C#
+void Main()
+{
+  using (var cn = Connection)
+  {
+    var result = cn.Query("select N'Wei' Name,26 Age,{=VipLevel} VipLevel", new User{ VipLevel = 1}).First();
+  }
+}
+```
+
+## Why Literal Replacement can avoid caching problems?
+
+First, trace the GetLiteralTokens method under the source code GetCacheInfo, you can find that before cache Dapper will get the data `SQL string`  that match `{=Attribute_Name}` role  .
+
+```C#
+private static readonly Regex literalTokens = new Regex(@"(?<![\p{L}\p{N}_])\{=([\p{L}\p{N}_]+)\}", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.CultureInvariant | RegexOptions.Compiled);
+internal static IList<LiteralToken> GetLiteralTokens(string sql)
+{
+  if (string.IsNullOrEmpty(sql)) return LiteralToken.None;
+  if (!literalTokens.IsMatch(sql)) return LiteralToken.None;
+
+  var matches = literalTokens.Matches(sql);
+  var found = new HashSet<string>(StringComparer.Ordinal);
+  List<LiteralToken> list = new List<LiteralToken>(matches.Count);
+  foreach (Match match in matches)
+  {
+    string token = match.Value;
+    if (found.Add(match.Value))
+    {
+      list.Add(new LiteralToken(token, match.Groups[1].Value));
+    }
+  }
+  return list.Count == 0 ? LiteralToken.None : list;
+}
+```
+
+Then generate Parameter parameterized dynamic method in the CreateParamInfoGenerator method. The method IL of this section is as below:
+
+```C#
+IL_0000: ldarg.1    
+IL_0001: castclass  <>f__AnonymousType1`1[System.Int32]
+IL_0006: stloc.0    
+IL_0007: ldarg.0    
+IL_0008: callvirt   System.Data.IDataParameterCollection get_Parameters()/System.Data.IDbCommand
+IL_000d: pop        
+IL_000e: ldarg.0    
+IL_000f: ldarg.0    
+IL_0010: callvirt   System.String get_CommandText()/System.Data.IDbCommand
+IL_0015: ldstr      "{=VipLevel}"
+IL_001a: ldloc.0    
+IL_001b: callvirt   Int32 get_VipLevel()/<>f__AnonymousType1`1[System.Int32]
+IL_0020: stloc.1    
+IL_0021: ldloca.s   V_1
+
+IL_0023: call       System.Globalization.CultureInfo get_InvariantCulture()/System.Globalization.CultureInfo
+IL_0028: call       System.String ToString(System.IFormatProvider)/System.Int32
+IL_002d: callvirt   System.String Replace(System.String, System.String)/System.String
+IL_0032: callvirt   Void set_CommandText(System.String)/System.Data.IDbCommand
+IL_0037: ret        
+```
+
+Then generate the Mapping dynamic method. To understand this logic, I will make a simulation example here:
+
+```C#
+public  static  class  DbExtension
+{
+  public static IEnumerable<User> Query(this DbConnection cnn, string sql, User parameter)
+  {
+    using (var command = cnn.CreateCommand())
+    {
+      command.CommandText = sql;
+      CommandLiteralReplace(command, parameter);
+      using (var reader = command.ExecuteReader())
+        while (reader.Read())
+          yield return Mapping(reader);
+    }
+  }
+
+  private static void CommandLiteralReplace(IDbCommand cmd, User parameter)
+  {
+    cmd.CommandText = cmd.CommandText.Replace("{=VipLevel}", parameter.VipLevel.ToString(System.Globalization.CultureInfo.InvariantCulture));
+  }
+
+  private  static  User  Mapping ( IDataReader  reader )
+  {
+    var user = new User();
+    var value = default(object);
+    value = reader[0];
+    if(!(value is System.DBNull))
+      user.Name = (string)value;
+    value = reader[1];
+    if (!(value is System.DBNull))
+      user.Age = (int)value;
+    value = reader[2];
+    if (!(value is System.DBNull))
+      user.VipLevel = (int)value;
+    return user;
+  }
+}
+```
+
+After reading the above example, you can find that the underlying principle of Dapper Literal Replacements is `string replace`that it also belongs to the string contacting way. Why can the cache problem be avoided?
+
+This is because the replacement timing is in the SetParameter dynamic method, so the Cache `SQL Key is unchanged`can reuse the same SQL string and cache.
+
+Also because it is a string replace method, `only support basic value type` if you use the String type, the system will inform you `The type String is not supported for SQL literals.`to avoid SQL Injection problems.
+
+## How to use Query Multi Mapping
+
+Then explain the `Dapper Multi Mapping`(multi-mapping) implementation and the underlying logic. After all, there can not always one-to-one relation in work.
+
+How to use:
+
+*   You need to write your own Mapping logic and use it: `Query<Func>(SQL,Parameter,Mapping Func)`
+*   Need to specify the generic parameter type, the rule is `Query<Func first type,Func second type,..,Func last type>` (supports up to six sets of generic parameters)
+*   Specify the name of the cutting field `ID` , it is used by default , if it is different, it needs to be specified (specially explained later in this paragraph)
+*   The order is `from left to right`
+
+For example: There is an order (Order) and a member (User) form, the relationship is a one-to-many relationship, a member can have multiple orders, the following is the C# Demo code:
+
+```C#
+void Main()
+{
+	using (var ts = new TransactionScope())
+	using (var cn = new SqlConnection(@"Data Source=(localdb)\MSSQLLocalDB;Integrated Security=SSPI;Initial Catalog=master;"))
+	{
+		cn.Execute(@"
+      CREATE TABLE [User]([ID] int, [Name] nvarchar(10));
+      INSERT INTO [User]([ID], [Name])VALUES(1, N'Jack'),(2, N'Lee');
+
+      CREATE TABLE [Order]([ID] int, [OrderNo] varchar(13), [UserID] int);
+      INSERT INTO [Order]([ID], [OrderNo], [UserID])VALUES(1, 'SO20190900001', 1),(2, 'SO20190900002', 1),(3, 'SO20190900003', 2),(4, 'SO20190900004', 2);
+    ");
+
+		var result = cn.Query<Order, User, Order>(@"
+        select * from [order] T1
+        left join [User] T2 on T1.UserId = T2.ID    
+      ", (order, user) =>
+		{
+			order.User = user;
+			return order;
+		}
+		);
+
+		ts.Dispose();
+	}
+}
+
+public class Order
+{
+	public int ID { get; set; }
+	public string OrderNo { get; set; }
+	public User User { get; set; }
+}
+
+public class User
+{
+	public int ID { get; set; }
+	public string Name { get; set; }
+}
+```
+
+![image](https://user-images.githubusercontent.com/12729184/101133422-ab533d80-3643-11eb-8df6-38d2424d50e4.png)
+
+#### Support dynamic Multi Mapping
+
+In the initial stage, the table structure is often changed or the one-time function and does not want to declare the class. Dapper Multi Mapping also supports the dynamic method.
+
+```C#
+void  Main ()
+{
+  using (var ts = new TransactionScope())
+  using (var connection = Connection)
+  {
+    const string createSql = @"
+            create table Users (Id int, Name nvarchar(20))
+            create table Posts (Id int, OwnerId int, Content nvarchar(20))
+
+            insert Users values(1, N'Jack')
+            insert Users values(2, N'Lee')
+
+            insert Posts values(101, 1, N'Jack's first day diary') 
+            insert Posts values(102, 1, N'Jack's second day diary') 
+            insert Posts values(103, 2, N'Lee's first day diary ') 
+" ;
+     connection . Execute ( createSql );    
+
+    const string sql =
+      @"select * from Posts p 
+      left join Users u on u.Id = p.OwnerId 
+      Order by p.Id
+    ";
+
+    var data = connection.Query<dynamic, dynamic, dynamic>(sql, (post, user) => { post.Owner = user; return post; }).ToList();
+	}
+}
+```
+
+### SplitOn distinguish type Mapping group
+
+Split Default is used to cut the primary key, so default cut string is `ID`, if the table structure PK name is ID can omit parameters, for example
+
+```C#
+var result = cn.Query<Order,User,Order>(@"
+  select * from [order] T1
+  left join [User] T2 on T1.UserId = T2.ID    
+  ", (order, user) => { 
+    order.User = user;
+    return order;
+  }
+);
+```
+
+If the primary key name is another name, ` specify the splitOn string name` and it corresponds to multiple names, it can be used `,`as a segmentation. For example, add a product table as Join:
+
+```C#
+var result = cn.Query<Order,User,Item,Order>(@"
+  select * from [order] T1
+  left join [User] T2 on T1.UserId = T2.ID  
+  left join [Item] T3 on T1.ItemId = T3.ID
+  "
+  
+  ,map :  (order, user,item) => { 
+    order.User = user;
+    order.Item = item;
+    return order;
+  }
+  ,splitOn : "Id,Id"
+);
+```
+
+## Query Multi Mapping underlying principle
+
+First, with a simple Demo.  
+
+1. Create a Mapping FUNC collection corresponding to the number of generic class parameters
+2. The Mapping FUNC setup logic is the same as Query Emit Il
+3. Call the user's Custom Mapping Func, where the parameters are derived from the previously dynamically generated Mapping Func
+
+```C#
+public static class MutipleMappingDemo
+{
+	public static IEnumerable<TReturn> Query<T1, T2, TReturn>(this IDbConnection connection, string sql, Func<T1, T2, TReturn> map)
+	   where T1 : Order, new()
+	   where T2 : User, new() // These two where is purely for Demo convenience
+	{
+		// 1. Create a Mapping FUNC collection corresponding to the number of generic class parameters
+		var deserializers = new List<Func<IDataReader, object>>();
+		{
+			// 2. The Mapping FUNC setup logic is the same as Query Emit Il
+			deserializers.Add((reader) =>
+		 {
+			 var newObj = new T1();
+			 var value = default(object);
+			 value = reader[0];
+			 newObj.ID = value is DBNull ? 0 : (int)value;
+			 value = reader[1];
+			 newObj.OrderNo = value is DBNull ? null : (string)value;
+			 return newObj;
+		 });
+
+			deserializers.Add((reader) =>
+			{
+				var newObj = new T2();
+				var value = default(object);
+				value = reader[2];
+				newObj.ID = value is DBNull ? 0 : (int)value;
+				value = reader[4];
+				newObj.Name = value is DBNull ? null : (string)value;
+				return newObj;
+			});
+		}
+
+
+		using (var command = connection.CreateCommand())
+		{
+			command.CommandText = sql;
+			using (var reader = command.ExecuteReader())
+			{
+				while (reader.Read())
+				{
+					// 3. Call the user's Custom Mapping Func, where the parameters are derived from the previously dynamically generated Mapping Func
+					yield return map(deserializers[0](reader) as T1, deserializers[1](reader) as T2);
+				}
+			}
+		}
+	}
+}
+```
+
+#### Support multiple groups of type + strongly typed return values
+
+Dapper using multiple generic parameter methods for` strongly typed multi-class Mapping` has disadvantage that it can not be dynamically adjusted and needs to be fixed.
+
+For example, you can see that the image GenerateMapper method fix the strong transition logic in terms of the number of generic arguments, which is why Multiple Query has a maximum number of groups and can only support up to six.
+
+![image](https://user-images.githubusercontent.com/12729184/101134421-4f89b400-3645-11eb-905e-b8fc58aeb55a.png)
+
+#### Multi-Class generic caching algorithm
+
+- Dapper use `Generic Class`to save multiple types of data by strong-type
+  [![20191001175139.png](https://camo.githubusercontent.com/720ebdacbccc81455dc58e0bcd06e3c843c24ac4169d03a4b1e9ec97661eae8c/68747470733a2f2f692e6c6f6c692e6e65742f323031392f31302f30312f356553666b6f615169495058767a342e706e67)](https://camo.githubusercontent.com/720ebdacbccc81455dc58e0bcd06e3c843c24ac4169d03a4b1e9ec97661eae8c/68747470733a2f2f692e6c6f6c692e6e65742f323031392f31302f30312f356553666b6f615169495058767a342e706e67)
+- And cooperate with inheritance to share most of the identity verification logic
+- Provide available `override` GetType method to customize generic comparison logic to avoid non-multiple query `Cache conflict`.
+
+![image](https://user-images.githubusercontent.com/12729184/101134891-fff7b800-3645-11eb-814d-e73cc5671260.png)
+
+![image](https://user-images.githubusercontent.com/12729184/101134914-084ff300-3646-11eb-9d13-f1b8721d9a07.png)
+
+#### Select order of Dapper Query Multi Mapping is important
+
+Because of SplitOn group logic depend on `Select Order`, it is possible that `attribute value wrong` when sequence is wrong .
+
+Example: If the SQL in the above example is changed to the following, the ID of User will become the ID of Order; the ID of Order will become the ID of User.
+
+```sql
+select T2.[ID],T1.[OrderNo],T1.[UserID],T1.[ID],T2.[Name] from [order] T1
+left join [User] T2 on T1.UserId = T2.ID  
+```
+
+The reason can be traced to Dapper's cutting algorithm
+
+\1. First, the field group by `reverse order`, the GetNextSplit method can be seen `DataReader Index`  from `large to small`.  
+![image](https://user-images.githubusercontent.com/12729184/101135549-eb67ef80-3646-11eb-8230-b70ae986b343.png)
+
+\2. Then process the Mapping Emit IL Func of the type in `reverse order`
+
+\3. Finally, it is reversed to `positive order`, which is convenient for the use of Call Func corresponding to generics later.
+
+![image](https://user-images.githubusercontent.com/12729184/101135698-1f431500-3647-11eb-8b24-9753f9b46065.png)
+
+![image](https://user-images.githubusercontent.com/12729184/101135716-25d18c80-3647-11eb-9ed0-4c6ce1ddea75.png)
+
+![image](https://user-images.githubusercontent.com/12729184/101135734-2c600400-3647-11eb-955f-aced6db3b221.png)
+
+## QueryMultiple underlying logic
+
+Example:
+
+```C#
+  using (var cn = Connection)
+  {
+    using (var gridReader = cn.QueryMultiple("select 1; select 2;"))
+    {
+      Console.WriteLine(gridReader.Read<int>()); //result : 1
+      Console.WriteLine(gridReader.Read<int>()); //result : 2
+    }
+  }
+```
+
+Advantages of using QueryMultiple:
+
+- Mainly reduce the number of Reqeust
+- Multiple queries can `share the same set of parameter` 
+
+The underlying implementation logic of QueryMultiple:
+
+- The underlying technology is ADO.NET-DataReader-MultipleResult
+- QueryMultiple gets DataReader and encapsulates it into GridReader
+- The Mapping dynamic method is only created when the Read method is called, and the Emit IL action is the same as the Query method.
+- Then call ADO.NET `DataReader NextResult` to get the next set of query result
+- `DataReader will be released` if there is no next set of query results
+
+### Cache algorithm
+
+The caching algorithm adds more gridIndex judgments, mainly for each result mapping action as a cache.
+
+![image](https://user-images.githubusercontent.com/12729184/101137558-fb350300-3649-11eb-9ddf-d8b7e32b6132.png)
+
+### No delayed query feature
+
+Note that the Read method uses `buffer = true` the returned result is directly stored in the `ToList memory`, so there is no delayed query feature.
+
+![image](https://user-images.githubusercontent.com/12729184/101137683-2c153800-364a-11eb-8b91-670ae17e49d6.png)
+
+![image](https://user-images.githubusercontent.com/12729184/101137695-30d9ec00-364a-11eb-91ae-4b176c30dc74.png)
+
+### Remember to manage the release of DataReader
+
+When Dapper calls the QueryMultiple method, the DataReader is encapsulated in the GridReader object, and the DataReader will be recycled only after `the last Read action`. 
+
+![image](https://user-images.githubusercontent.com/12729184/101137793-5666f580-364a-11eb-8a4f-033f921ebf37.png)
+
+Therefore, if you open a GridReader > Read before finishing reading, an error will show: `a DataReader related to this Command has been opened, and it must be closed first.`
+
+To avoid the above situation, you can change to the `using` block, and the DataReader will be automatically released after running the block code.
+
+## TypeHandler custom Mapping logic & its underlying logic
+
+When you want to customize some attribute Mapping logic, you can use `TypeHandler` in Dapper
+
+1. Create a class to inherit SqlMapper.TypeHandler
+2. Assign the class to be customized to the generic, e.g: `JsonTypeHandler<custom_type>: SqlMapper.TypeHandler<custom_type>`
+3. Override `Parse` method to custom `Query` logic, and override  `SetValue` method to custom `Create,Delete,Updte`  logic
+4. If there are multiple class Parse and SetValue share the same logic, you can change the implementation class to a generic method. The custom class can be specified in `AddTypeHandler`, which can avoid creating a lot of class, eg: `JsonTypeHandler<T>: SqlMapper.TypeHandler< T> where T: class`
+
+Example : when User level is changed, the change action will be automatically recorded in the Log field.
+
+```C#
+public class JsonTypeHandler<T> : SqlMapper.TypeHandler<T> 
+  where T : class
+{
+  public override T Parse(object value)
+  {
+    return JsonConvert.DeserializeObject<T>((string)value);
+  }
+
+  public override void SetValue(IDbDataParameter parameter, T value)
+  {
+    parameter.Value = JsonConvert.SerializeObject(value);
+  }
+}
+
+public void Main()
+{
+  SqlMapper.AddTypeHandler(new JsonTypeHandler<List<Log>>()); 
+
+  using (var ts = new TransactionScope())
+  using (var cn = new SqlConnection(@"Data Source=(localdb)\MSSQLLocalDB;Integrated Security=SSPI;Initial Catalog=master;"))
+  {
+
+    cn.Execute("create table [User] (Name nvarchar(200),Age int,Level int,Logs nvarchar(max))");
+
+    var user = new User()
+    {
+      Name = "Wei",
+      Age = 26,
+      Level = 1,
+      Logs = new List<Log>() {
+        new Log(){Time=DateTime.Now,Remark="CreateUser"}
+      }
+    };
+
+    // add
+    {
+      cn.Execute("insert into [User] (Name,Age,Level,Logs) values (@Name,@Age,@Level,@Logs);", user);
+
+      var result = cn.Query("select * from [User]");
+      Console.WriteLine(result);
+    }
+
+    // Level up
+    {
+      user.Level = 9;
+      user.Logs.Add(new Log() {Remark="UpdateLevel"});
+      cn.Execute("update [User] set Level = @Level,Logs = @Logs where Name = @Name", user);
+      var result = cn.Query("select * from [User]");
+      Console.WriteLine(result);
+    }
+
+    ts.Dispose();
+
+  }
+}
+
+public class User
+{
+  public string Name { get; set; }
+  public int Age { get; set; }
+  public int Level { get; set; }
+  public List<Log> Logs { get; set; }
+
+}
+public class Log
+{
+  public DateTime Time { get; set; } = DateTime.Now;
+  public string Remark { get; set; }
+}
+```
+
+![image](https://user-images.githubusercontent.com/12729184/101142670-e27c1b80-3650-11eb-992d-4d7b96069460.png)
+
+Then trace the TypeHandler source code logic, which needs to be traced in two parts: SetValue, Parse
+
+### The underlying logic of SetValue
+
+\1. AddTypeHandlerImpl method to manage the addition of cache  
+
+\2. When creating a dynamic AddParameter method in the CreateParamInfoGenerator method Emit, if there is data in the TypeHandler cache of the Mapping type, Emit adds an action to call the SetValue method.
+
+```C#
+if (handler != null)
+{
+  il.Emit(OpCodes.Call, typeof(TypeHandlerCache<>).MakeGenericType(prop.PropertyType).GetMethod(nameof(TypeHandlerCache<int>.SetValue))); // stack is now [parameters] [[parameters]] [parameter]
+}
+```
+
+\3. LookupDbType will be used when calling the AddParameters method at Runtime to determine whether there is a custom TypeHandler
+
+![image](https://user-images.githubusercontent.com/12729184/101142913-338c0f80-3651-11eb-8766-b577f1d9fcc1.png)
+
+![image](https://user-images.githubusercontent.com/12729184/101142928-37b82d00-3651-11eb-9c08-e40cdcc42f60.png)
+
+\4. Then pass the created Parameter to the custom TypeHandler.SetValue method
+
+![image](https://user-images.githubusercontent.com/12729184/101142987-4868a300-3651-11eb-99f4-b981dec8b97d.png)
+
+Finally, the C# code converted from IL
+
+```C#
+    public static void TestMeThod(IDbCommand P_0, object P_1)
+    {
+        User user = (User)P_1;
+        IDataParameterCollection parameters = P_0.Parameters;
+        //...
+        IDbDataParameter dbDataParameter3 = P_0.CreateParameter();
+        dbDataParameter3.ParameterName = "Logs";
+        dbDataParameter3.Direction = ParameterDirection.Input;
+        SqlMapper.TypeHandlerCache<List<Log>>.SetValue(dbDataParameter3, ((object)user.Logs) ?? ((object)DBNull.Value));
+        parameters.Add(dbDataParameter3);
+        //...
+    }
+```
+
+It can be found that the generated Emit IL will get our implemented TypeHandler from TypeHandlerCache, and then `call the implemented SetValue method` to run the set logic, and TypeHandlerCache uses `generic type` to save different handlers in `Singleton mode` according to different generics. This has the following advantages :
+
+1.  Same handler can be obtained to avoid repeated creation of objects
+2. Because it is a generic type, reflection actions can be avoided when the handler is taken, and `efficiency can be improved`
+
+![image](https://user-images.githubusercontent.com/12729184/101143328-b1501b00-3651-11eb-92aa-15cfde21e7c3.png)
+![image](https://user-images.githubusercontent.com/12729184/101143332-b319de80-3651-11eb-8291-90b6206bd82b.png)
+![image](https://user-images.githubusercontent.com/12729184/101143337-b4e3a200-3651-11eb-8d8a-c61251388351.png)
+
+### Parse corresponds to the underlying principle
+
+The main logic is when the GenerateDeserializerFromMap method Emit establishes the dynamic Mapping method, if it is judged that the TypeHandler cache has data, the Parse method replaces the original Set attribute action.
+
+![image](https://user-images.githubusercontent.com/12729184/101143441-d93f7e80-3651-11eb-8e00-070628abfe90.png)
+
+View the IL code generated by the dynamic Mapping method:
+
+```C#
+IL_0000: ldc.i4.0   
+IL_0001: stloc.0    
+IL_0002: newobj     Void .ctor()/Demo.User
+IL_0007: stloc.1    
+IL_0008: ldloc.1    
+IL_0009: dup        
+IL_000a: ldc.i4.0   
+IL_000b: stloc.0    
+IL_000c: ldarg.0    
+IL_000d: ldc.i4.0   
+IL_000e: callvirt   System.Object get_Item(Int32)/System.Data.IDataRecord
+IL_0013: dup        
+IL_0014: stloc.2    
+IL_0015: dup        
+IL_0016: isinst     System.DBNull
+IL_001b: brtrue.s   IL_0029
+IL_001d: unbox.any  System.String
+IL_0022: callvirt   Void set_Name(System.String)/Demo.User
+IL_0027: br.s       IL_002b
+IL_0029: pop        
+IL_002a: pop        
+IL_002b: dup        
+IL_002c: ldc.i4.1   
+IL_002d: stloc.0    
+IL_002e: ldarg.0    
+IL_002f: ldc.i4.1   
+IL_0030: callvirt   System.Object get_Item(Int32)/System.Data.IDataRecord
+IL_0035: dup        
+IL_0036: stloc.2    
+IL_0037: dup        
+IL_0038: isinst     System.DBNull
+IL_003d: brtrue.s   IL_004b
+IL_003f: unbox.any  System.Int32
+IL_0044: callvirt   Void set_Age(Int32)/Demo.User
+IL_0049: br.s       IL_004d
+IL_004b: pop        
+IL_004c: pop        
+IL_004d: dup        
+IL_004e: ldc.i4.2   
+IL_004f: stloc.0    
+IL_0050: ldarg.0    
+IL_0051: ldc.i4.2   
+IL_0052: callvirt   System.Object get_Item(Int32)/System.Data.IDataRecord
+IL_0057: dup        
+IL_0058: stloc.2    
+IL_0059: dup        
+IL_005a: isinst     System.DBNull
+IL_005f: brtrue.s   IL_006d
+IL_0061: unbox.any  System.Int32
+IL_0066: callvirt   Void set_Level(Int32)/Demo.User
+IL_006b: br.s       IL_006f
+IL_006d: pop        
+IL_006e: pop        
+IL_006f: dup        
+IL_0070: ldc.i4.3   
+IL_0071: stloc.0    
+IL_0072: ldarg.0    
+IL_0073: ldc.i4.3   
+IL_0074: callvirt   System.Object get_Item(Int32)/System.Data.IDataRecord
+IL_0079: dup        
+IL_007a: stloc.2    
+IL_007b: dup        
+IL_007c: isinst     System.DBNull
+IL_0081: brtrue.s   IL_008f
+IL_0083: call       System.Collections.Generic.List`1[Demo.Log] Parse(System.Object)/Dapper.SqlMapper+TypeHandlerCache`1[System.Collections.Generic.List`1[Demo.Log]]
+IL_0088: callvirt   Void set_Logs(System.Collections.Generic.List`1[Demo.Log])/Demo.User
+IL_008d: br.s       IL_0091
+IL_008f: pop        
+IL_0090: pop        
+IL_0091: stloc.1    
+IL_0092: leave      IL_00a4
+IL_0097: ldloc.0    
+IL_0098: ldarg.0    
+IL_0099: ldloc.2    
+IL_009a: call       Void ThrowDataException(System.Exception, Int32, System.Data.IDataReader, System.Object)/Dapper.SqlMapper
+IL_009f: leave      IL_00a4
+IL_00a4: ldloc.1    
+IL_00a5: ret        
+```
+
+Convert it into C# code to verify:
+
+```C#
+ public static User TestMeThod(IDataReader P_0)
+  {
+    int index = 0;
+    User user = new User();
+    object value = default(object);
+    try
+    {
+      User user2 = user;
+      index = 0;
+      object obj = value = P_0[0];
+      //..
+      index = 3;
+      object obj4 = value = P_0[3];
+      if (!(obj4 is DBNull))
+      {
+        user2.Logs = SqlMapper.TypeHandlerCache<List<Log>>.Parse(obj4);
+      }
+      user = user2;
+      return user;
+    }
+    catch (Exception ex)
+    {
+      SqlMapper.ThrowDataException(ex, index, P_0, value);
+      return user;
+    }
+  }
+```
+
+## Detailed processing of CommandBehavior
+
+This article will take readers to understand how Dapper uses CommandBehavior to optimize query efficiency, and how to choose the correct Behavior at a specific time.
+
+I have compiled the Behavior table corresponding to each method here:
+
+| method               | Behavior                                                     |
+| -------------------- | ------------------------------------------------------------ |
+| Query                | CommandBehavior.SequentialAccess & CommandBehavior.SingleResult |
+| QueryFirst           | CommandBehavior.SequentialAccess & CommandBehavior.SingleResult & CommandBehavior.SingleRow |
+| QueryFirstOrDefault  | CommandBehavior.SequentialAccess & CommandBehavior.SingleResult & CommandBehavior.SingleRow |
+| QuerySingle          | CommandBehavior.SingleResult & CommandBehavior.SequentialAccess |
+| QuerySingleOrDefault | CommandBehavior.SingleResult & CommandBehavior.SequentialAccess |
+| QueryMultiple        | CommandBehavior.SequentialAccess                             |
+
+---
+
+#### SequentialAccess, SingleResult optimization logic
+
+First, you can see that each method uses `CommandBehavior.SequentialAccess`. The main function of this tag is to make the `DataReader read rows and columns sequentially without buffering`. `After reading a column, it will be deleted from memory`.  It has the following advantages:
+
+\1. Resources can be read in order to `avoid binary large resources from being read into memory at one time`, especially Blob or Clob will cooperate with GetBytes or GetChars methods to limit the buffer size, Microsoft officials also have special attention:
+
+![image](https://user-images.githubusercontent.com/12729184/101143904-8619fb80-3652-11eb-9354-cfa40b7f5879.png)
+
+\2. Actual environment testing show it can `speed up query efficiency`. But it is `not` the default behavior of DataReader, the system `default is CommandBehavior.Default`
+
+![image](https://user-images.githubusercontent.com/12729184/101144007-ae095f00-3652-11eb-887d-8ef58bb0d2c6.png)
+
+CommandBehavior.Default has the below behaviors:
+
+1. Can return `multiple` result sets 
+2. Read row data to memory at once
+
+These two features are much different from the production environment. After all, most of the time,` only a set of result sets are needed with limited memory`, so in addition to SequentialAccess, Dapper also uses `CommandBehavior.SingleResult` in most methods, so that only one set of results is required. To avoid wasting resources.
+
+There is also a detailed processing of this paragraph. Looking at the source code, you can find that in addition to marking SingleResult, Dapper also specially adds code at the end `while(reader.NextResult()){}` instead of directly Return (such as the picture)
+
+![image](https://user-images.githubusercontent.com/12729184/101144300-0e989c00-3653-11eb-8b1a-af7b0ab0797f.png)
+
+Earlier, I specifically posted an Issue ([Link #1210](https://github.com/StackExchange/Dapper/issues/1210)) to ask author, here is the answer: `mainly to avoid ignoring errors, such as when the DataReader is closed early`.
+
+#### QueryFirst with SingleRow
+
+Sometimes we will encounter a situation where `select top 1` knows that only one row of data will be read. At this time, `QueryFirst` can be used. It uses `CommandBehavior.SingleRow` to avoid wasting resources and only read one row of data.
+
+In addition, it can be found that in addition to `while (reader.NextResult()){}`, Dapper also has `while (reader.Read()) {}`, which is also to avoid ignoring errors. This is something that some companies’ self-make ORMs will ignore.
+
+![image](https://user-images.githubusercontent.com/12729184/101144554-72bb6000-3653-11eb-9034-2fdfec1687ec.png)
+
+#### Differences with QuerySingle
+
+The difference between the two is that QuerySingle does not use CommandBehavior.SingleRow. As for why it is not used, it is because multiple rows of data are needed to `determine whether the conditions are not met and an Exception is thrown to inform the user`.
+
+There is a particularly fun trick to learn in Dapper. The error handling directly uses the Exception corresponding to LINQ. For example: more than one line of data is wrong, use `new int[2].Single()`, so you don't need to maintain the Exception class separately, and you can also have more `i18N` language message.
+
+![image](https://user-images.githubusercontent.com/12729184/101144744-c168fa00-3653-11eb-90b9-798071e69cac.png)
+
+![image](https://user-images.githubusercontent.com/12729184/101144760-c62dae00-3653-11eb-8b73-bded7da67e9f.png)
+
+## The underlying logic of Parameter parameterization
+
+One key function of Dapper: "Parameterization"
+
+Main logic: GetCacheInfo checks whether there is a dynamic method in the cache >  If there is no cache, use the CreateParamInfoGenerator method Emit IL to create the AddParameter dynamic method >  Save it in the cache after creation
+
+Next, we will focus on the underlying logic and "exquisite detail processing" in the CreateParamInfoGenerator method, using the result reverse code method, `ignoring the "unused fields"` and not generating the corresponding IL code to avoid resource waste. This is also the reason why the previous caching algorithm has to check different SQL strings.
+
+The following are the key parts of the source code I picked:
+
+```C#
+internal static Action<IDbCommand, object> CreateParamInfoGenerator(Identity identity, bool checkForDuplicates, bool removeUnused, IList<LiteralToken> literals)
+{
+  //...
+  if (filterParams)
+  {
+    props = FilterParameters(props, identity.sql);
+  }
+
+  var callOpCode = isStruct ? OpCodes.Call : OpCodes.Callvirt;
+  foreach (var prop in props)
+  {
+    //Emit IL action
+  }
+  //...
+}
+
+
+private static IEnumerable<PropertyInfo> FilterParameters(IEnumerable<PropertyInfo> parameters, string sql)
+{
+  var list = new List<PropertyInfo>(16);
+  foreach (var p in parameters)
+  {
+    if (Regex.IsMatch(sql, @"[?@:]" + p.Name + @"([^\p{L}\p{N}_]+|$)", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.CultureInvariant))
+      list.Add(p);
+  }
+  return list;
+}
+```
+
+Then check IL to verify, the query code is as follows
+
+```C#
+var result = connection.Query("select @Name name ", new { Name = "Wei", Age = 26}).First();
+```
+
+The IL code of the CreateParamInfoGenerator AddParameter dynamic method is as below:
+
+```C#
+IL_0000: ldarg.1    
+IL_0001: castclass  <>f__AnonymousType1`2[System.String,System.Int32]
+IL_0006: stloc.0    
+IL_0007: ldarg.0    
+IL_0008: callvirt   System.Data.IDataParameterCollection get_Parameters()/System.Data.IDbCommand
+IL_000d: dup        
+IL_000e: ldarg.0    
+IL_000f: callvirt   System.Data.IDbDataParameter CreateParameter()/System.Data.IDbCommand
+IL_0014: dup        
+IL_0015: ldstr      "Name"
+IL_001a: callvirt   Void set_ParameterName(System.String)/System.Data.IDataParameter
+IL_001f: dup        
+IL_0020: ldc.i4.s   16
+IL_0022: callvirt   Void set_DbType(System.Data.DbType)/System.Data.IDataParameter
+IL_0027: dup        
+IL_0028: ldc.i4.1   
+IL_0029: callvirt   Void set_Direction(System.Data.ParameterDirection)/System.Data.IDataParameter
+IL_002e: dup        
+IL_002f: ldloc.0    
+IL_0030: callvirt   System.String get_Name()/<>f__AnonymousType1`2[System.String,System.Int32]
+IL_0035: dup        
+IL_0036: brtrue.s   IL_0042
+IL_0038: pop        
+IL_0039: ldsfld     System.DBNull Value/System.DBNull
+IL_003e: ldc.i4.0   
+IL_003f: stloc.1    
+IL_0040: br.s       IL_005a
+IL_0042: dup        
+IL_0043: callvirt   Int32 get_Length()/System.String
+IL_0048: ldc.i4     4000
+IL_004d: cgt        
+IL_004f: brtrue.s   IL_0058
+IL_0051: ldc.i4     4000
+IL_0056: br.s       IL_0059
+IL_0058: ldc.i4.m1  
+IL_0059: stloc.1    
+IL_005a: callvirt   Void set_Value(System.Object)/System.Data.IDataParameter
+IL_005f: ldloc.1    
+IL_0060: brfalse.s  IL_0069
+IL_0062: dup        
+IL_0063: ldloc.1    
+IL_0064: callvirt   Void set_Size(Int32)/System.Data.IDbDataParameter
+IL_0069: callvirt   Int32 Add(System.Object)/System.Collections.IList
+IL_006e: pop        
+IL_006f: pop        
+IL_0070: ret            
+```
+
+IL converted to C# code:
+
+```C#
+public class TestType
+{
+  public static void TestMeThod(IDataReader P_0, object P_1)
+  {
+    var anon = (<>f__AnonymousType1<string, int>)P_1;
+    IDataParameterCollection parameters = ((IDbCommand)P_0).Parameters;
+    IDbDataParameter dbDataParameter = ((IDbCommand)P_0).CreateParameter();
+    dbDataParameter.ParameterName = "Name";
+    dbDataParameter.DbType = DbType.String;
+    dbDataParameter.Direction = ParameterDirection.Input;
+    object obj = anon.Name;
+    int num;
+    if (obj == null)
+    {
+      obj = DBNull.Value;
+      num = 0;
+    }
+    else
+    {
+      num = ((((string)obj).Length > 4000) ? (-1) : 4000);
+    }
+    dbDataParameter.Value = obj;
+    if (num != 0)
+    {
+      dbDataParameter.Size = num;
+    }
+    parameters.Add(dbDataParameter);
+  }
+}
+```
+
+It can be found that although the Age parameter is passed, the SQL string is not used, and Dapper will not generate the SetParameter action IL for this field. This detail processing really needs to give Dapper a thumbs up!
+
+## The underlying logic of IN multi-set parameterization
+
+Why ADO.NET does not support IN parameterization, but Dapper does?
+
+\1. Check whether the attribute of the parameter is a subclass of IEnumerable 
+
+\2. If yes, use the parameter name + regular format to find the parameter string in SQL `(regular format: ([?@:]Parameter name)(?!\w)(\s+(?i)unknown(?- i))?)`
+
+\3. Replace the found string with `()` + multiple `attribute names + serial number`
+
+\4. CreateParameter> SetValue in order of serial number
+
+Key Code part
+
+![image](https://user-images.githubusercontent.com/12729184/101145551-ea3dbf00-3654-11eb-9590-2ba3418b004a.png)
+
+The following uses sys.objects to check SQL Server tables and views as an example of tracking:
+
+```C#
+var result = cn.Query(@"select * from sys.objects where type_desc In @type_descs", new { type_descs = new[] { "USER_TABLE", "VIEW" } });
+```
+
+Dapper will change the SQL string to the following sql to execute
+
+```C#
+select * from sys.objects where type_desc In (@type_descs1,@type_descs2)
+-- @type_descs1 = nvarchar(4000) - 'USER_TABLE'
+-- @type_descs2 = nvarchar(4000) - 'VIEW'
+```
+
+Looking at Emit IL, you can find that it is very different from the previous parameterized IL, which is very clean.
+
+```C#
+IL_0000: ldarg.1    
+IL_0001: castclass  <>f__AnonymousType0`1[System.String[]]
+IL_0006: stloc.0    
+IL_0007: ldarg.0    
+IL_0008: callvirt   System.Data.IDataParameterCollection get_Parameters()/System.Data.IDbCommand
+IL_000d: ldarg.0    
+IL_000e: ldstr      "type_descs"
+IL_0013: ldloc.0    
+IL_0014: callvirt   System.String[] get_type_descs()/<>f__AnonymousType0`1[System.String[]]
+IL_0019: call       Void PackListParameters(System.Data.IDbCommand, System.String, System.Object)/Dapper.SqlMapper
+IL_001e: pop        
+IL_001f: ret   
+```
+
+Turning to C# code, you will be surprised to find: `This code does not need to use Emit IL at all. It is simply unnecessary.`
+
+```C#
+    public static void TestMeThod(IDbCommand P_0, object P_1)
+    {
+        var anon = (<>f__AnonymousType0<string[]>)P_1;
+        IDataParameterCollection parameter = P_0.Parameters;
+        SqlMapper.PackListParameters(P_0, "type_descs", anon.type_descs);
+    }
+```
+
+That's right, it is unnecessary, even `IDataParameterCollection parameter = P_0.Parameters`; this code will not be used at all.
+
+There is a reason for Dapper, because it can be used with `non-collective parameters`, such as the previous example and the data logic to find the name of the order.
+
+```C#
+var result = cn.Query(@"select * from sys.objects where type_desc In @type_descs and name like @name"
+    , new { type_descs = new[] { "USER_TABLE", "VIEW" }, @name = "order%" });
+```
+
+The corresponding generated IL conversion C# code will be the following code, which can be used together:
+
+```C#
+    public static void TestMeThod(IDbCommand P_0, object P_1)
+    {
+        <>f__AnonymousType0<string[], string> val = P_1;
+        IDataParameterCollection parameters = P_0.Parameters;
+        SqlMapper.PackListParameters(P_0, "type_descs", val.get_type_descs());
+        IDbDataParameter dbDataParameter = P_0.CreateParameter();
+        dbDataParameter.ParameterName = "name";
+        dbDataParameter.DbType = DbType.String;
+        dbDataParameter.Direction = ParameterDirection.Input;
+        object obj = val.get_name();
+        int num;
+        if (obj == null)
+        {
+            obj = DBNull.Value;
+            num = 0;
+        }
+        else
+        {
+            num = ((((string)obj).Length > 4000) ? (-1) : 4000);
+        }
+        dbDataParameter.Value = obj;
+        if (num != 0)
+        {
+            dbDataParameter.Size = num;
+        }
+        parameters.Add(dbDataParameter);
+    }
+```
+
+In addition, why does Emit IL directly call the tool method `PackListParameters` on Dapper? Because the number of IN parameters is not fixed, the method `cannot be dynamically generated from the fixed result`.
+
+The main logic contained in this method:
+
+1. Determine the type of the set parameter (if it is a string, the default size is 4000)
+2. Regular role of SQL parameters are replaced with serial number parameter strings
+3. Creation of DbCommand Paramter
+
+![image](https://user-images.githubusercontent.com/12729184/101146110-97183c00-3655-11eb-90b8-0db8dec91d77.png)
+
+The replacement logic of the SQL parameter string is also written here, such as the picture
+
+![image](https://user-images.githubusercontent.com/12729184/101146159-a303fe00-3655-11eb-92c5-99968b387881.png)
+
+## DynamicParameter underlying logic and custom implementation
+
+For example:  
+
+```C#
+using (var cn = Connection)
+{
+    var paramter = new { Name = "John", Age = 25 };
+    var result = cn.Query("select @Name Name,@Age Age", paramter).First();
+}
+```
+
+We already know that String type Dapper will automatically convert to database `Nvarchar` and a parameter with a `length of 4000`. The SQL actually executed by the database is as below:
+
+```sql
+exec sp_executesql N'select @Name Name,@Age Age',N'@Name nvarchar(4000),@Age int',@Name=N'John',@Age=25
+```
+
+This is an intimate design that is convenient for rapid development, but if you encounter a situation where the field is of `varchar` type, it may cause the `index to fail` due to the `implicit transformation`, resulting in low query efficiency.
+
+At this time, the solution can use Dapper DynamicParamter to specify the database type and size to achieve the purpose of optimizing performance
+
+```C#
+using (var cn = Connection)
+{
+    var paramters = new DynamicParameters();
+    paramters.Add("Name","John",DbType.AnsiString,size:4);
+    paramters.Add("Age",25,DbType.Int32);
+    var result = cn.Query("select @Name Name,@Age Age", paramters).First();
+}
+```
+
+Then go to the source to see how to implement it. First, pay attention to the GetCacheInfo method. You can see that DynamicParameters create a dynamic method. The code is very simple, just call the AddParameters method.
+
+```C#
+Action<IDbCommand, object> reader;
+if (exampleParameters is IDynamicParameters)
+{
+    reader = (cmd, obj) => ((IDynamicParameters)obj).AddParameters(cmd, identity);
+}
+```
+
+The reason why the code can be so simple is that Dapper uses an `"interface-dependent"` design here to increase the flexibility of the program and allow users to customize the implementation logic they want. This point will be explained below. First, let's look at the implementation logic of the `AddParameters` method in Dapper's default implementation class `DynamicParameters`.
+
+```C#
+public class DynamicParameters : SqlMapper.IDynamicParameters, SqlMapper.IParameterLookup, SqlMapper.IParameterCallbacks
+{
+    protected void AddParameters(IDbCommand command, SqlMapper.Identity identity)
+    {
+        var literals = SqlMapper.GetLiteralTokens(identity.sql);
+
+        foreach (var param in parameters.Values)
+        {
+            if (param.CameFromTemplate) continue;
+
+            var dbType = param.DbType;
+            var val = param.Value;
+            string name = Clean(param.Name);
+            var isCustomQueryParameter = val is SqlMapper.ICustomQueryParameter;
+
+            SqlMapper.ITypeHandler handler = null;
+            if (dbType == null && val != null && !isCustomQueryParameter)
+            {
+#pragma warning disable 618
+                dbType = SqlMapper.LookupDbType(val.GetType(), name, true, out handler);
+#pragma warning disable 618
+            }
+            if (isCustomQueryParameter)
+            {
+                ((SqlMapper.ICustomQueryParameter)val).AddParameter(command, name);
+            }
+            else if (dbType == EnumerableMultiParameter)
+            {
+#pragma warning disable 612, 618
+                SqlMapper.PackListParameters(command, name, val);
+#pragma warning restore 612, 618
+            }
+            else
+            {
+                bool add = !command.Parameters.Contains(name);
+                IDbDataParameter p;
+                if (add)
+                {
+                    p = command.CreateParameter();
+                    p.ParameterName = name;
+                }
+                else
+                {
+                    p = (IDbDataParameter)command.Parameters[name];
+                }
+
+                p.Direction = param.ParameterDirection;
+                if (handler == null)
+                {
+#pragma warning disable 0618
+                    p.Value = SqlMapper.SanitizeParameterValue(val);
+#pragma warning restore 0618
+                    if (dbType != null && p.DbType != dbType)
+                    {
+                        p.DbType = dbType.Value;
+                    }
+                    var s = val as string;
+                    if (s?.Length <= DbString.DefaultLength)
+                    {
+                        p.Size = DbString.DefaultLength;
+                    }
+                    if (param.Size != null) p.Size = param.Size.Value;
+                    if (param.Precision != null) p.Precision = param.Precision.Value;
+                    if (param.Scale != null) p.Scale = param.Scale.Value;
+                }
+                else
+                {
+                    if (dbType != null) p.DbType = dbType.Value;
+                    if (param.Size != null) p.Size = param.Size.Value;
+                    if (param.Precision != null) p.Precision = param.Precision.Value;
+                    if (param.Scale != null) p.Scale = param.Scale.Value;
+                    handler.SetValue(p, val ?? DBNull.Value);
+                }
+
+                if (add)
+                {
+                    command.Parameters.Add(p);
+                }
+                param.AttachedParam = p;
+            }
+        }
+
+        // note: most non-priveleged implementations would use: this.ReplaceLiterals(command);
+        if (literals.Count != 0) SqlMapper.ReplaceLiterals(this, command, literals);
+    }
+}
+```
+
+It can be found that Dapper has made many conditions and actions in AddParameters for convenience and compatibility with other functions, such as Literal Replacement and EnumerableMultiParameter functions, so the amount of code will be more than the previous version of ADO.NET, so `the efficiency will be slower`.
+
+If you have demanding requirements for efficiency, you can implement the logic yourself, because this section of Dapper is specially designed to `"depend on the interface"`, and you only need to `implement the IDynamicParameters interface`.
+
+The following is a demo I made, you can use ADO.NET SqlParameter to establish parameters to cooperate with Dapper
+
+```C#
+public class CustomPraameters : SqlMapper.IDynamicParameters
+{
+  private SqlParameter[] parameters;
+  public void Add(params SqlParameter[] mParameters)
+  {
+    parameters = mParameters;
+  }
+
+  void SqlMapper.IDynamicParameters.AddParameters(IDbCommand command, SqlMapper.Identity identity)
+  {
+    if (parameters != null && parameters.Length > 0)
+      foreach (var p in parameters)
+        command.Parameters.Add(p);
+  }
+}
+```
+
+![image](https://user-images.githubusercontent.com/12729184/101188682-fe9fad00-3690-11eb-9553-37ca92e7b10e.png)
+
+
+
+## The underlying logic of single and multiple Execute
+
+After the Query, Mapping, and Parameters are explained, we will then explain that use the Execute method in adding, deleting, and modifying by Dapper. Execute Dapper is divided into `single execute and `multiple execute`.
+
+#### Single Execute
+
+In terms of a single execution, the logic of Dapper is the encapsulation of ADO.NET's ExecuteNonQuery. The purpose of encapsulation is to be used with `Dapper's Parameter and caching functions`. The code logic is concise and clear. There is no more explanation here, such as the picture
+
+![image](https://user-images.githubusercontent.com/12729184/101189043-7bcb2200-3691-11eb-954d-7b0087ad03a3.png)
+
+#### "Multiple" Execute
+
+This is a characteristic feature of Dapper, which simplifies the operations between the collection operations Execute and simplifies the code. Only: `connection.Execute("sql",collection parameters);`.
+
+Why it is so convenient, the following is the underlying logic:
+
+\1. Confirm whether it is a collection parameter
+
+![image](https://user-images.githubusercontent.com/12729184/101189227-b8971900-3691-11eb-9f47-34a374eb4694.png)
+
+\2. Create a `common DbCommand` to provide foreach iterative call to avoid repeated create and waste of resources
+
+![image](https://user-images.githubusercontent.com/12729184/101189341-debcb900-3691-11eb-8c70-efb0eab94782.png)
+
+\3. If it is a set of parameters, create an Emit IL dynamic method and put it in the cache for use
+
+![image](https://user-images.githubusercontent.com/12729184/101189402-f8f69700-3691-11eb-949a-c6bf22ac6846.png)
+
+\4. The dynamic method logic is `CreateParameter> Assign Parameter> Use Parameters.Add to add a new parameter`. The following is the C# code converted by Emit IL:
+
+```C#
+  public static void ParamReader(IDbCommand P_0, object P_1)
+  {
+    var anon = (<>f__AnonymousType0<int>)P_1;
+    IDataParameterCollection parameters = P_0.Parameters;
+    IDbDataParameter dbDataParameter = P_0.CreateParameter();
+    dbDataParameter.ParameterName = "V";
+    dbDataParameter.DbType = DbType.Int32;
+    dbDataParameter.Direction = ParameterDirection.Input;
+    dbDataParameter.Value = anon.V;
+    parameters.Add(dbDataParameter);
+  }
+```
+
+\5. `foreach` the set of parameters> except for the first time, clear the DbCommand parameters in each iteration> re-call the `same` dynamic method to add parameters> reqeust SQL query
+
+The implementation method is simple and clear, and the details consider sharing resources to avoid waste `(eg sharing the same DbCommand, Func)`, but in the case of a large number of execution pursuit efficiency requirements, you need to pay special attention to this method `every time you run to send a request to the database`, the efficiency will be the network transmission is slow, so this function is called `"multiple execution" instead of "batch execution"`.
+
+For example, simple Execute inserts ten pieces of data, and you can see that the system has received 10 Reqeust when viewing SQL Profiler:
+
+```C#
+using (var cn = new SqlConnection(@"Data Source=(localdb)\MSSQLLocalDB;Integrated Security=SSPI;Initial Catalog=Northwind;"))
+{
+    cn.Open();
+    using (var tx = cn.BeginTransaction())
+    {
+        cn.Execute("create table #T (V int);", transaction: tx);
+        cn.Execute("insert into #T (V) values (@V)", Enumerable.Range(1, 10).Select(val => new { V = val }).ToArray() , transaction:tx);
+
+        var result = cn.Query("select * from #T", transaction: tx);
+        Console.WriteLine(result);
+    }
+}
+```
+
+![image](https://user-images.githubusercontent.com/12729184/101189851-8afe9f80-3692-11eb-86dd-41064b259594.png)
+
+## ExecuteScalar
+
+ExecuteScalar is an often forgotten function because `it can only read the first set of results, the first row, and the first data`. However, it can still come in handy under specific needs, like `"Check Existence"`.
+
+First, how does Entity Framwork efficiently check whether data exists?
+
+If the reader with EF experience will answer to use `Any instead of Count()> 1`. Using the Count system will help convert SQL to:
+
+```C#
+SELECT COUNT(*) AS [value] FROM [Table] AS [t0]
+```
+
+SQL Count is a summary function that will `iterate the qualified data rows to determine whether the data in each row is null` and return the number of rows.
+
+The Any syntax conversion SQL uses `EXISTS`. It only cares `whether there is data or not`. It means that there is `no need to check each column`, so the efficiency is fast.
+
+```C#
+SELECT 
+    (CASE 
+        WHEN EXISTS(
+            SELECT NULL AS [EMPTY]
+            FROM [Table] AS [t0]
+            ) THEN 1
+        ELSE 0
+     END) AS [value]
+```
+
+#### How does Dapper achieve the same effect?
+
+SQL Server can use the SQL format `select top 1 1 from [table] where conditions` with the ExecuteScalar method, and then make an extension method, as follow:
+
+```C#
+public static class DemoExtension
+{
+  public static bool Any(this IDbConnection cn,string sql,object paramter = null)
+  {
+    return cn.ExecuteScalar<bool>(sql,paramter);
+  }
+}
+```
+
+![image](https://user-images.githubusercontent.com/12729184/101190490-65be6100-3693-11eb-94c2-c41ad718feec.png)
+
+The reason for this simple use is that Dapper ExecuteScalar will call ExecuteScalarImpl and its underlying Parse logic
+
+```C#
+private static T ExecuteScalarImpl<T>(IDbConnection cnn, ref CommandDefinition command)
+{
+    //..
+    object result;
+    //..
+    result = cmd.ExecuteScalar();
+    //..
+    return Parse<T>(result);
+}
+
+private static T Parse<T>(object value)
+{
+    if (value == null || value is DBNull) return default(T);
+    if (value is T) return (T)value;
+    var type = typeof(T);
+    //..
+    return (T)Convert.ChangeType(value, type, CultureInfo.InvariantCulture);
+}
+```
+
+Use Convert.ChangeType to convert to bool: `"0=false, non-0=true"` logic, so that the system can simply convert to bool value.
+
+#### Note
+
+Don't replace by QueryFirstOrDefault, because it requires additional Null check in SQL, otherwise "NullReferenceException" will show.
+
+The reason is that the two Parse implementations are different, and the QueryFirstOrDefault check the result to be null.
+
+![20191003043941.png](https://camo.githubusercontent.com/80646646c310e49436934f8e71066c5a7d8727df3643b3374de01ab09fcd5329/68747470733a2f2f692e6c6f6c692e6e65742f323031392f31302f30332f546a4870647778444d5775566141352e706e67)
+
+The Parce implementation of ExecuteScalar has more check to `use the default value when it is empty`
+
+![image](https://user-images.githubusercontent.com/12729184/101190897-fc8b1d80-3693-11eb-84a7-30c9d8dffef7.png)
+
+## Summary
+
+The Dapper series end here, and the important underlying logics are almost finished. This series took the me 25 consecutive days. In addition to helping readers, the biggest gain is that I understand the underlying logic of Dapper better during this period and learn Dapper details and processing.
+
+In addition, I would like to mention that Marc Gravell, one of the authors of Dapper, is really very enthusiastic. During the writing of the article, there are a few conceptual questions. If you ask an issue, he will reply enthusiastically and in detail. And he also found that he has high requirements for the quality of the code.For example: I asked a question on SO, and he left a message below: `"He is actually not satisfied with the current Dapper IL architecture, and even feels it rough, and wants to use protobuf-net technology to rewrite"`(Respect!)
+
+![image](https://user-images.githubusercontent.com/12729184/101191369-8e932600-3694-11eb-9498-be0888f05efa.png)
+
+Finally, I would like to say: the original intention of writing this is to hope that this series can help readers
+
+1. Understand the underlying logic, know why, avoid writing monsters that eat efficiency, and take full advantage of Dapper to develop projects
+2. You can easily face Dapper interviews, and answer deeper concepts than ordinary engineers.
+3. From the simplest Reflection to the commonly used Expression to the most detailed Emit builds the Mapping method from scratch, taking readers to gradually understand the underlying strong type Mapping logic of Dapper
+4. Understand the important concept of dynamic creation method `"Code Converted From Result"`.
+5. With basic IL capabilities, you can use IL to reverse C# code to understand the underlying Emit logic of other projects
+6. Understand that Dapper `cannot use error strings to contact SQL` because of the algorithm logic of the cache
+
+Thanks :)
