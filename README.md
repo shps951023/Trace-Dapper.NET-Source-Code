@@ -7,56 +7,6 @@ Simplified Chinese : [https://www.cnblogs.com/ITWeiHan/p/11614704.html](https://
 
 ----
 
-*   [Introduction](#user-content-introduction-)
-*   [Installation Environment](#user-content-installation-environment-)
-*   [Dynamic Query](#user-content-dynamic-query)
-    *   *   [Why can Dapper be so convenient and support dynamic?](#user-content-why-can-dapper-be-so-convenient-and-support-dynamic)
-    *   [Why inherit IDictionary<string,object>?](#user-content-why-inherit-idictionarystringobject)
-*   [Principle of Strongly Typed Mapping Part1: ADO.NET vs. Dapper](#user-content-principle-of-strongly-typed-mapping-part1-adonet-vs-dapper)
-    *   [ADO.NET vs. Dapper](#user-content-adonet-vs-dapper)
-*   [Principle of Strongly Typed Mapping Part2: Reflection version](#user-content-principle-of-strongly-typed-mapping-part2-reflection-version)
-*   [Principle of Strongly Typed Mapping Part3: The important concept of dynamic create method "code from result" optimizes efficiency](#user-content-principle-of-strongly-typed-mapping-part3-the-important-concept-of-dynamic-create-method-code-from--result-optimizes-efficiency)
-*   [Principle of Strongly Typed Mapping Part4: Expression version](#user-content-principle-of-strongly-typed-mapping-part4-expression-version)
-*   [Rewrite Expression version](#user-content-rewrite-expression-version)
-*   [Principle of Strongly Typed Mapping Part5: Emit IL convert to C# code](#user-content-principle-of-strongly-typed-mapping-part5-emit-il-convert-to-c-code)
-    *   [How to check like Dapper, only Emit IL doesn’t have C# Source Code Project](#user-content-how-to-check-like-dapper-only-emit-il-doesnt-have-c-source-code-project)
-*   [Strongly Typed Mapping Principle Part6: Emit Version](#user-content-strongly-typed-mapping-principle-part6-emit-version)
-    *   [Emit Label](#user-content-emit-label)
-*   [One of the keys to Dapper's fast efficiency: Cache principle](#user-content-one-of-the-keys-to-dappers-fast-efficiency-cache-principle)
-    *   [Identity、GetCacheInfo](#user-content-identitygetcacheinfo)
-*   [Wrong SQL string contacting will cause slow efficiency and memory leaks](#user-content-wrong-sql-string-contacting-will-cause-slow-efficiency-and-memory-leaks)
-*   [Dapper SQL correct string contacting method: Literal Replacement](#user-content-dapper-sql-correct-string-contacting-method-literal-replacement)
-*   [Why Literal Replacement can avoid caching problems?](#user-content-why-literal-replacement-can-avoid-caching-problems)
-*   [How to use Query Multi Mapping](#user-content-how-to-use-query-multi-mapping)
-    *   *   [Support dynamic Multi Mapping](#user-content-support-dynamic-multi-mapping)
-    *   [SplitOn distinguish type Mapping group](#user-content-spliton-distinguish-type-mapping-group)
-*   [Query Multi Mapping underlying principle](#user-content-query-multi-mapping-underlying-principle)
-    *   [Support multiple groups of type + strongly typed return values](#user-content-support-multiple-groups-of-type--strongly-typed-return-values)
-    *   [Multi\-Class generic caching algorithm](#user-content-multi-class-generic-caching-algorithm)
-    *   [Select order of Dapper Query Multi Mapping is important](#user-content-select-order-of-dapper-query-multi-mapping-is-important)
-*   [QueryMultiple underlying logic](#user-content-querymultiple-underlying-logic)
-    *   [Cache algorithm](#user-content-cache-algorithm)
-    *   [No delayed query feature](#user-content-no-delayed-query-feature)
-    *   [Remember to manage the release of DataReader](#user-content-remember-to-manage-the-release-of-datareader)
-*   [TypeHandler custom Mapping logic & its underlying logic](#user-content-typehandler-custom-mapping-logic--its-underlying-logic)
-    *   [The underlying logic of SetValue](#user-content-the-underlying-logic-of-setvalue)
-    *   [Parse corresponds to the underlying principle](#user-content-parse-corresponds-to-the-underlying-principle)
-*   [Detailed processing of CommandBehavior](#user-content-detailed-processing-of-commandbehavior)
-    *   [SequentialAccess, SingleResult optimization logic](#user-content-sequentialaccess-singleresult-optimization-logic)
-    *   [QueryFirst with SingleRow](#user-content-queryfirst-with-singlerow)
-    *   [Differences with QuerySingle](#user-content-differences-with-querysingle)
-*   [The underlying logic of Parameter parameterization](#user-content-the-underlying-logic-of-parameter-parameterization)
-*   [The underlying logic of IN multi\-set parameterization](#user-content-the-underlying-logic-of-in-multi-set-parameterization)
-*   [DynamicParameter underlying logic and custom implementation](#user-content-dynamicparameter-underlying-logic-and-custom-implementation)
-*   [The underlying logic of single and multiple Execute](#user-content-the-underlying-logic-of-single-and-multiple-execute)
-    *   [Single Execute](#user-content-single-execute)
-    *   ["Multiple" Execute](#user-content-multiple-execute)
-*   [ExecuteScalar](#user-content-executescalar)
-    *   [How does Dapper achieve the same effect?](#user-content-how-does-dapper-achieve-the-same-effect)
-*   [Summary](#user-content-summary)
-
-----
-
 ## Introduction
 
 After years of promotion by Industry Veterans and StackOverflow, “Dapper with Entity Framework” is a powerful combination that deal the needs of `“safe, convenient, efficient, maintainable” `.
@@ -88,7 +38,7 @@ With Dapper dynamic Query, you can save time in modifying class attributes in th
 
 When the table is stable, use the POCO generator to quickly generate the Class and convert it to strong type maintenance, e.g [PocoClassGenerator](https://github.com/shps951023/PocoClassGenerator)..
 
-#### Why can Dapper be so convenient and support dynamic?
+### Why can Dapper be so convenient and support dynamic?
 
 Two key points can be found by tracing the source code of the Query method
 
@@ -801,7 +751,7 @@ void Main()
 
 But this is not the process for a project that has been written. Developers may not kindly tell you the logic of the original design.  
 
-#### How to check like Dapper, only Emit IL doesn’t have C# Source Code Project
+## How to check like Dapper, only Emit IL doesn’t have C# Source Code Project
 
 My solution is: `「Since only Runtime can know IL, save IL as a static file and decompile and view」`
 
@@ -1030,7 +980,7 @@ public static class DemoExtension
 
 There are many detailed of Emit here. First pick out the important concepts to explain.
 
-### Emit Label
+**Emit Label**
 
 In Emit if/else, you need to use Label positioning, tell the compiler which position to jump to when the condition is true/false, for example: `boolean to integer`, assuming that you want to simply convert Boolean to Int, C# code can use `If it is True Return 1 otherwise return 0` logic to write:
 
@@ -1108,7 +1058,7 @@ Then trace the Dapper source code. This time, we need to pay special attention t
 
 ![image](https://user-images.githubusercontent.com/12729184/101129638-ef8f0f80-363c-11eb-8463-73a9ee081b1b.png)
 
-### Identity、GetCacheInfo
+**Identity、GetCacheInfo**
 
 Identity mainly encapsulates the comparison Key attribute of each cache:
 
@@ -1454,7 +1404,7 @@ public class User
 
 ![image](https://user-images.githubusercontent.com/12729184/101133422-ab533d80-3643-11eb-8df6-38d2424d50e4.png)
 
-#### Support dynamic Multi Mapping
+## Support dynamic Multi Mapping
 
 In the initial stage, the table structure is often changed or the one-time function and does not want to declare the class. Dapper Multi Mapping also supports the dynamic method.
 
@@ -1488,7 +1438,7 @@ void  Main ()
 }
 ```
 
-### SplitOn distinguish type Mapping group
+## SplitOn distinguish type Mapping group
 
 Split Default is used to cut the primary key, so default cut string is `ID`, if the table structure PK name is ID can omit parameters, for example
 
@@ -1580,7 +1530,7 @@ public static class MutipleMappingDemo
 }
 ```
 
-#### Support multiple groups of type + strongly typed return values
+### Support multiple groups of type + strongly typed return values
 
 Dapper using multiple generic parameter methods for ` strongly typed multi-class Mapping` has disadvantage that it can not be dynamically adjusted and needs to be fixed.
 
@@ -1588,7 +1538,7 @@ For example, you can see that the image GenerateMapper method fix the strong tra
 
 ![image](https://user-images.githubusercontent.com/12729184/101134421-4f89b400-3645-11eb-905e-b8fc58aeb55a.png)
 
-#### Multi-Class generic caching algorithm
+### Multi-Class generic caching algorithm
 
 - Dapper use `Generic Class`to save multiple types of data by strong-type
   [![20191001175139.png](https://camo.githubusercontent.com/720ebdacbccc81455dc58e0bcd06e3c843c24ac4169d03a4b1e9ec97661eae8c/68747470733a2f2f692e6c6f6c692e6e65742f323031392f31302f30312f356553666b6f615169495058767a342e706e67)](https://camo.githubusercontent.com/720ebdacbccc81455dc58e0bcd06e3c843c24ac4169d03a4b1e9ec97661eae8c/68747470733a2f2f692e6c6f6c692e6e65742f323031392f31302f30312f356553666b6f615169495058767a342e706e67)
@@ -1599,7 +1549,7 @@ For example, you can see that the image GenerateMapper method fix the strong tra
 
 ![image](https://user-images.githubusercontent.com/12729184/101134914-084ff300-3646-11eb-9d13-f1b8721d9a07.png)
 
-#### Select order of Dapper Query Multi Mapping is important
+### Select order of Dapper Query Multi Mapping is important
 
 Because of SplitOn group logic depend on `Select Order`, it is possible that `attribute value wrong` when sequence is wrong .
 
@@ -2404,13 +2354,13 @@ public class CustomPraameters : SqlMapper.IDynamicParameters
 
 After the Query, Mapping, and Parameters are explained, we will then explain that use the Execute method in adding, deleting, and modifying by Dapper. Execute Dapper is divided into `single execute and `multiple execute`.
 
-#### Single Execute
+### Single Execute
 
 In terms of a single execution, the logic of Dapper is the encapsulation of ADO.NET's ExecuteNonQuery. The purpose of encapsulation is to be used with `Dapper's Parameter and caching functions`. The code logic is concise and clear. There is no more explanation here, such as the picture
 
 ![image](https://user-images.githubusercontent.com/12729184/101189043-7bcb2200-3691-11eb-954d-7b0087ad03a3.png)
 
-#### "Multiple" Execute
+### "Multiple" Execute
 
 This is a characteristic feature of Dapper, which simplifies the operations between the collection operations Execute and simplifies the code. Only: `connection.Execute("sql",collection parameters);`.
 
@@ -2494,7 +2444,7 @@ SELECT
      END) AS [value]
 ```
 
-#### How does Dapper achieve the same effect?
+### How does Dapper achieve the same effect?
 
 SQL Server can use the SQL format `select top 1 1 from [table] where conditions` with the ExecuteScalar method, and then make an extension method, as follow:
 
