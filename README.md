@@ -3,11 +3,11 @@ Trace Dapper.NET Source Code
 
 ## Introduction <a name="page1"></a>
 
-After years of promotion by Industry Veterans and StackOverflow, “Dapper with Entity Framework” is a powerful combination that deal the needs of “safe, convenient, efficient, maintainable” .
+After years of promotion by Industry Veterans and StackOverflow, “Dapper with Entity Framework” is a powerful combination that deal the needs of `“safe, convenient, efficient, maintainable” `.
 
 But the current network articles, although there are many articles on Dapper but stay on how to use, no one systematic explanation of the source code logic. So with this article “Trace Dapper Source Code” want to take you into the Dapper code, to understand the details of the design, efficient principles, and learn up practical application in the work.
 
-## Installation Environment <a name="page2"></a>
+## Installation Environment <a name="page1"></a>
 
 1. Clone the latest version from [Dapper's Github](https://github.com/StackExchange/Dapper) 
 2. Create .Net Core Console project
@@ -28,25 +28,24 @@ My Personal Environment
 
 ## Dynamic Query
 
-With Dapper dynamic Query, you can save time in modifying class attributes in the early stages of development because the table structure is still `in fixing`, or it isn’t worth the extra effort to declare class lightweight requirements. 
+With Dapper dynamic Query, you can save time in modifying class attributes in the early stages of development because the table structure is still `in the adjustment stage`, or it isn’t worth the extra effort to declare class lightweight requirements. 
 
-Use POCO generator to quickly generate `
-Strong type` Class to strongly maintain when the table is stable, e.g [PocoClassGenerator](https://github.com/shps951023/PocoClassGenerator).
+When the table is stable, use the POCO generator to quickly generate the Class and convert it to strong type maintenance, e.g [PocoClassGenerator](https://github.com/shps951023/PocoClassGenerator)..
 
-### Why can Dapper be so convenient and support dynamic?
+#### Why can Dapper be so convenient and support dynamic?
 
-Going to the source of the Query method can reveals two important points.
+Two key points can be found by tracing the source code of the Query method
 
 1. The entity class is actually `DapperRow` that transformed implicitly to dynamic.
    ![](https://i.imgur.com/ca1QuS8.png)
-2. DapperRow inherits `IDynamicMetaObjectProviderand` implements corresponding methods.
+2. DapperRow inherits `IDynamicMetaObjectProviderand` & implements corresponding methods.
    ![](https://i.imgur.com/aBXnex4.png)
 
 For this logic, I will make a simplified version of Dapper dynamic Query to let readers understand the conversion logic:
 
 1. Create a `dynamic` type variable, the entity type is `ExpandoObject`.  
-2. Because there’s an inheritance relationship that can be transformed`IDictionary<string, object>`
-3. Use DataReader to get the field name using GetName, get the value from the field index, and add both to the Dictionary as a key and value, respectively
+2. Because there’s an inheritance relationship that can be transformed to `IDictionary<string, object>`
+3. Use DataReader to get the field name using GetName, get the value from the `field index`, and add both to the Dictionary as a key and value
 4. Because expandobject has the implementation IDynamicMetaObjectProvider interface that can be converted to dynamic
 
 ```C#
@@ -78,9 +77,7 @@ public static class DemoExtension
 }
 ```
 
-![](https://i.imgur.com/nndidpV.png)
-
-Now that we have the concept of the simple expandobject Dynamic Query example, go to the deep  level to see how Dapper handles the details and why dapper customize the DynamicMetaObjectProvider.
+Now that we have the concept of the simple expandobject Dynamic Query example, go to the deep level to see how Dapper handles the details and why dapper customize the DynamicMetaObjectProvider.
 
 First, learn the Dynamic Query process logic:
 code: 
@@ -96,13 +93,13 @@ using (var cn = new SqlConnection(@"Data Source=(localdb)\MSSQLLocalDB;Integrate
 The value of the process would be: 
 Create Dynamic FUNC > stored in the cache > use `result.Name` >  transfer to call `((DapperRow)result)["Name"]` > from `DapperTable.Values Array` with `index value corresponding to the field "Name" in the Values array` to get value.
 
-Then look at the source code of the GetDapperRowDeserializer method, which controls the logic of how dynamic runs, and is dynamically established as Func for upper-level API calls and cache reuse.
+Then look at the source code of the GetDapperRowDeserializer method, which controls the logic of how dynamic runs, and is dynamically created as Func for upper-level API calls and cache reuse.
 
 ![](https://i.imgur.com/H5zJAlV.png)
 
 This section of Func logic:
 
-1. Although DapperTable is a local variable in the method, it is referenced by the generated Func, so it is `not saved by GC` and always stored in the memory and reused.
+1. Although DapperTable is a local variable in the method, it is referenced by the generated Func, so it will not be GC and always stored in the memory and reused.
    ![](https://i.imgur.com/dhz0bND.png)
 2. Because it is dynamic, there is no need to consider the type Mapping, here directly use `GetValue(index)` to get value from database.  
 
@@ -137,29 +134,31 @@ private sealed partial class DapperRow : System.Dynamic.IDynamicMetaObjectProvid
 }
 ```
 
-5. DapperRowMetaObject main function is to define behavior, by override `BindSetMember、BindGetMember` method, Dapper defines Get, Set of behavior were used `IDictionary<string, object> - GetItem` with `DapperRow - SetValue`
+5. DapperRowMetaObject main function is to define behavior, by override `BindSetMember、BindGetMember` method, Dapper defines Get, Set of behavior were used `IDictionary<string, object> - GetItem` , `DapperRow - SetValue`
    ![](https://i.imgur.com/LRuCkeB.png)
 6. Finally, Dapper uses the DataReader `column order` , first using the column name to get Index, then using Index and Values.  
    ![](https://i.imgur.com/W2SzdOF.png)
 
-## Why inherit IDictionary<string,object>?
+### Why inherit IDictionary<string,object>?
 
-One question to consider: If you can define the Get and Set behaviors on your own at Dapperrowmetaobject, does using the Dictionary-GetItem method in some other way mean that you don’t need to inherit the `idictionary<string, object>` ?
+There is a question to think about: In DapperRowMetaObject, you can define the Get and Set behaviors by yourself, so instead of using the Dictionary-GetItem method, instead of using other methods, does it mean that `you don't need to inherit IDictionary<string,object>`?
 
-One of the reasons Dapper does this has to do with the open principle. Dappertable and Dapperrow are both low-level implementation and `should not be open to users` based on the open-closed principle, so they are `private`.
+One of the reasons for Dapper to do this is related to the open principle. DapperTable and DapperRow are all low-level implementation class. Based on the open and closed principle, they `should not be opened to users`, so they are set as `private`.
 
 ```C#
 private class DapperTable{/*...*/}
 private class DapperRow :IDictionary<string, object>, IReadOnlyDictionary<string, object>,System.Dynamic.IDynamicMetaObjectProvider{/*...*/}
 ```
 
-What if the user wants to know the field name? Because of Dapperrow’s implementation of Idictionary, you can move up to `IDictionary<string, object>` and use it to get field data for the public interface feature.
+What if the user wants to know the field name? 
+
+Because DapperRow implements IDictionary, it can be `upcasting` to `IDictionary<string, object>`, and use it to get field data by ` public interface`.
 
 ```C#
 public interface IDictionary<TKey, TValue> : ICollection<KeyValuePair<TKey, TValue>>, IEnumerable<KeyValuePair<TKey, TValue>>, IEnumerable{/*..*/}
 ```
 
-For example, I’ve created a small tool called [HtmlTableHelper](https://github.com/shps951023/HtmlTableHelper) that takes advantage of this feature to automatically convert Dapper Dynamic Query to Table Html, like the following code and images
+For example, I’ve created a tool called [HtmlTableHelper](https://github.com/shps951023/HtmlTableHelper) to use this feature to automatically convert Dapper Dynamic Query to Table Html, such as the following code and picture
 
 ```C#
 using (var cn = "Your Connection")
@@ -171,11 +170,11 @@ using (var cn = "Your Connection")
 
 ![](https://i.imgur.com/D8es51O.png)
 
-## 3. Principle of Strongly Typed Mapping Part1: ADO.NET vs. Dapper
+## Principle of Strongly Typed Mapping Part1: ADO.NET vs. Dapper
 
-Next is the key function of Dapper `Strongly Typed Mapping` . Because of the high difficulty, it will be divided into multiple articles for explanation.
+Next is the key function of Dapper, `Strongly Typed Mapping`. Because of the difficulty, it will be divided into multiple parts for explanation.
 
-In the first article, compare ADO.NET DataReader GetItem By Index with Dapper Strongly Typed Query, check the difference between the IL and understand the main logic of Dapper Query Mapping.
+In the first part, compare ADO.NET DataReader GetItem By Index with Dapper Strongly Typed Query, check the difference between the IL and understand the main logic of Dapper Query Mapping.
 
 With the logic, how to implement it, I use three techniques in order: `Reflection、Expression、Emit` implement three versions of the Query method from scratch to let readers understand gradually.
 
@@ -210,13 +209,11 @@ Here we need to focus on the `Dapper.SqlMapper.GenerateDeserializerFromMap` meth
 
 
 
-To understand this IL logic, my way: `「Don’t go straight to the details, but first look at the fully generated IL. 」` As for how to view it, you need to prepare the [il\-visualizer](https://github.com/drewnoakes/il-visualizer) open source tool first, which can view the IL generated by DynamicMethod at Runtime.
+To understand this IL logic, my way: `"You should not go directly to the details, but check the complete IL first"` As for how to view it, you need to prepare the [il\-visualizer](https://github.com/drewnoakes/il-visualizer) open source tool first, which can view the IL generated by DynamicMethod at Runtime.
 
+It supports vs 2015 and 2017 by default. If you use vs2019 like me
 
-
-It supports vs 2015 and 2017 by default. If you use vs2019 like me, you need to pay attention
-
-1. Need to manually extract the `%USERPROFILE%\Documents\Visual Studio 2019`path below
+1. Need to manually extract the `%USERPROFILE%\Documents\Visual Studio 2019` path below
 2. `.netstandard2.0` The project needs to be created `netstandard2.0` and unzipped to this folder
    ![image](https://user-images.githubusercontent.com/12729184/101119088-88b22c00-3625-11eb-9904-2d0033113522.png)
 
@@ -356,9 +353,9 @@ IL_0056:  ldloc.s     04
 IL_0058:  ret     
 ```
 
-It can be compared with the IL generated by Dapper shows that it is `roughly the same` (the differences will be explained later), which means that the logic and efficiency of the two operations will be similar, which is `Dapper efficiency is close to the native ado.net` one of the reasons why.
+It can be compared with the IL generated by Dapper shows that it is `roughly the same` (the differences will be explained later), which means that the logic and efficiency of the two operations will be similar, which is `Dapper efficiency is close to the native ado.net` the reasons why.
 
-##  Principle of Strongly Typed Mapping Part2: Reflection version
+## Principle of Strongly Typed Mapping Part2: Reflection version
 
 In the previous ado.net Mapping example, we found a serious problem with `there is no way to share multiple classes of methods, and each new class requires a code rewrite`. To solve this problem, write a common method that does different logical processing for different classes during the Runtime.
 
@@ -366,9 +363,9 @@ There are three main implementation methods: Reflection, Expression, and Emit. H
 
 Logic:
 
-1.  Use generics to pass dynamic categories
+1.  Use generics to pass dynamic class
 2.  Use `Generic constraints new()` to create objects dynamically
-3.  DataReader need to use `The attribute string name is used as Key` , you can use Reflection acquire property name of the dynamic type in by `DataReader this[string parameter]` obtaining data from database
+3.  DataReader need to use  `attribute string name is used as Key` , you can use Reflection to get the attribute name of the dynamic type and get the database data through the `DataReader this[string parameter]`
 4.  Use PropertyInfo.SetValue to dynamically assign database data to objects
 
 Finally got the following code:
@@ -387,13 +384,13 @@ public static class DemoExtension
     }
   }
 
-  // 1. Use generics to pass dynamic categories 
+  // 1. Use generics to pass dynamic class 
   private  static  T  CastToType < T >( this  IDataReader  reader ) where  T : new ()
   {
-    // 2. Use generic conditions to constrain new() to dynamically create objects 
+    // 2. Use `Generic constraints new()` to create objects dynamically
     var  instance  =  new  T ();
 
-    // 3.DataReader needs to use the property string name as the Key. You can use Reflection to get the property name of the dynamic category. Use the DataReader this[string parameter] to get the database data 
+    // 3.DataReader need to use  `attribute string name is used as Key` , you can use Reflection to get the attribute name of the dynamic type and get the database data through the `DataReader this[string parameter]`
     var  type  =  typeof ( T );
      var  props  =  type . GetProperties ();
      foreach ( var  p  in  props )
@@ -410,24 +407,22 @@ public static class DemoExtension
 }
 ```
 
-The advantage of the Reflection version is the code `simple`, but it has the following problems
+The advantage of the Reflection version is that the code is `simple`, but it has the following problems
 
-1. The property query should not be repeated. If it is not used, it should be ignored. Example: If the class has N properties, SQL means to query 3 fields, and the ORM PropertyInfo foreach N times is not 3 times each time. And Dapper specially optimized this logic in Emit IL: `「Check how much you use, not waste」` (explained after this paragraph ).
+1. The attribute query should not be repeated, and it should be ignored if it is not used. Example: If the class has N properties, SQL means to query 3 fields, and the ORM PropertyInfo foreach N times is not 3 times each time. And Dapper specially optimized this logic in Emit IL: `「Check how much you use, not waste」`.
    ![image](https://user-images.githubusercontent.com/12729184/101120154-dcbe1000-3627-11eb-8e1b-79a6e3777dbc.png)
 
 2. Efficiency issues:
 
-- The reflection efficiency will be slower. After this point, the solution will be introduced: `「Key Cache + Dynamic Create Method」` exchange space for time.
+- The reflection efficiency will be slower.  the solution will be introduced later: `「Key Cache + Dynamic Create Method」` exchange space for time.
 
 - Using the string Key value will call more `GetOrdinal` methods, you can check the official MSDN explanation `its efficiency is worse than Index value` .
 
   ![image](https://user-images.githubusercontent.com/12729184/101120383-75549000-3628-11eb-9c8b-be3c3e654c46.png)
 
-## Principle of Strongly Typed Mapping Part3: The important concept of dynamic create method "result inversion code" optimizes efficiency
+## Principle of Strongly Typed Mapping Part3: The important concept of dynamic create method "code from  result" optimizes efficiency
 
 Then use Expression to solve the Reflection version problem, mainly using Expression features: `「Methods can be dynamically created during Runtime」` to solve the problem.
-
-
 
 Before this, we need to have an important concept: `「Reverse the most concise code from the result」` optimizing efficiency. For example: In the past, a classic topic of "printing regular triangle stars'' when learning a program to make a regular triangle of length 3, the common practice would be loop + recursion the way
 
@@ -472,7 +467,7 @@ void  Main ()
 {
   using (var cn = Connection)
   {
-    var result = cn.Query<User>("select N'暐翰' Name,26 Age").First();
+    var result = cn.Query<User>("select N'Wei' Name,26 Age").First();
   }
 }
 
@@ -522,7 +517,7 @@ Logic:
 
 1.  Get all field names of sql select
 2.  Obtain the attribute data of the mapping type > encapsulate the index, sql field and class attribute data in a variable for later use
-3.  Dynamic create method: Read the data we want from the database Reader in order, where the code logic:
+3.  Dynamic create method: Read the data we want from the database Reader in order,  the code logic:
 
 ```C#
 User dynamic method ( IDataReader  reader )
@@ -600,7 +595,7 @@ public static class DemoExtension
       // method(IDataReader reader)
       var exParam = Expression.Parameter(typeof(DbDataReader), "reader");
 
-      // Mapping category object = new Mapping category(); 
+      // Mapping class object = new Mapping class(); 
       var  exVar  =  Expression . Variable ( type , " mappingObj " );
        var  exNew  =  Expression . New ( type );
       {
@@ -662,7 +657,7 @@ public static class DemoExtension
 
 ![image](https://user-images.githubusercontent.com/12729184/101126967-822cb000-3637-11eb-8f1f-4b2194951181.png)
 
-Finally, check Expression.Lambda > DebugView (note that it is a non-public attribute) verification code:
+Finally, check Expression.Lambda > DebugView (note that it is a non-public attribute) :
 
 ```C#
 .Lambda #Lambda1<System.Func`2[System.Data.Common.DbDataReader,System.Object]>(System.Data.Common.DbDataReader $reader) {
@@ -696,9 +691,9 @@ Finally, check Expression.Lambda > DebugView (note that it is a non-public attri
 
 ## Principle of Strongly Typed Mapping Part5: Emit IL convert to C# code
 
-With the concept of the previous Expression version, we can then enter the core technology at the deep of Dapper: Emit.
+With the concept of the previous Expression version, we can then enter the core technology of Dapper: Emit.
 
-First of all, there must be a concept, MSIL (CIL) is intended to be seen by the JIT compiler, so the readability will be poor and difficult to debug, but more detailed logical operations can be done compared to Expression.
+First of all, there must be a concept, MSIL (CIL) is intended for JIT compiler, so the readability will be poor and difficult to debug, but more detailed logical operations can be done compared to Expression.
 
 In the actual environment development and use Emit, usually `c# code > Decompilation to IL > use Emit to build dynamic methods` , for example:
 
@@ -722,7 +717,7 @@ IL_000B:  nop
 IL_000C:  ret 
 ```
 
-\3. Use DynamicMethod + Emit to establish a dynamic method
+\3. Use DynamicMethod + Emit to create a dynamic method
 
 ```C#
 void Main()
@@ -757,7 +752,7 @@ My solution is: `「Since only Runtime can know IL, save IL as a static file and
 You can use the `MethodBuild + Save` method here `Save IL as static exe file > Decompile view` , but you need to pay special attention
 
 1. Please correspond to the parameters and return type, otherwise it will compile error.
-2. netstandard does not support this method, Dapper needs to be used `region if yourversion to distinguish, otherwise it cannot be used, such as picture![image](https://user-images.githubusercontent.com/12729184/101128488-c1a8cb80-363a-11eb-8f35-38fafa1ccf8d.png)
+2. netstandard does not support this method, Dapper needs to be used `region if yourversion` to distinguish, otherwise it cannot be used, such as picture![image](https://user-images.githubusercontent.com/12729184/101128488-c1a8cb80-363a-11eb-8f35-38fafa1ccf8d.png)
 
 code show as below :
 
@@ -820,13 +815,11 @@ public static User TestMeThod(IDataReader P_0)
 
 
 
-After having the C# code, it will be much faster to understand the Emit logic, and then you can enter the Emit version Query implementation part.
-
-
+After having the C# code, it will be much faster to understand the Emit logic.
 
 ## Strongly Typed Mapping Principle Part6: Emit Version
 
-The following code is the Emit version, I wrote the corresponding IL part of C# in the comments.
+The following code is the Emit version, I wrote the corresponding IL part of C# code
 
 ```C#
 public static class DemoExtension
@@ -979,9 +972,9 @@ public static class DemoExtension
 }
 ```
 
-There are many detailed concepts of Emit here. First pick out the important concepts to explain.
+There are many detailed of Emit here. First pick out the important concepts to explain.
 
-## Emit Label
+### Emit Label
 
 In Emit if/else, you need to use Label positioning, tell the compiler which position to jump to when the condition is true/false, for example: `boolean to integer`, assuming that you want to simply convert Boolean to Int, C# code can use `If it is True Return 1 otherwise return 0` logic to write:
 
@@ -992,7 +985,7 @@ public static int BoolToInt(bool input) => input ? 1 : 0;
 When converting to Emit, the following logic is required:
 
 1.  Consider the label dynamic positioning problem
-2.  The label must be established first to let Brtrue\_S know which label position to set when the conditions are met `(Note:at this time the label position has not been determined yet)`
+2.  The label must be established first to let Brtrue\_S know which label position to set when the conditions are true `(Note:at this time the label position has not been determined yet)`
 3.  Continue to build IL from top to bottom in order
 4.  Wait until `match condition` you want to run the block `previous line` , use it `MarkLabel to position Label` .
 
@@ -1031,7 +1024,7 @@ public class Program
 
 Here you can find the Emit version, which has the advantage of:
 
-\1. To do more detailed manipulations
+\1. Can do more detailed operations
 
 \2. Because the detail granularity is small, the efficiency that can be optimized is better
 
@@ -1051,7 +1044,7 @@ Having said that, there are some powerful open source projects that use Emit to 
 
 Why can Dapper be so fast?  
 
-I introduced the dynamic use of Emit IL to establish the ADO.NET Mapping method, but this function alone cannot make Dapper the king of lightweight ORM efficiency.
+I introduced the dynamic use of Emit IL to establish the ADO.NET Mapping method, but this function cannot make Dapper the king of lightweight ORM efficiency.
 
 Because the dynamic create method is `Cost and time consuming` action, simply using it will slow down the speed. But when it cooperates with Cache, it is different. By storing the established method in Cache, you can use the `『Space for time』` concept to speed up the efficiency of the query .
 
@@ -1187,7 +1180,7 @@ public static class DemoExtension
 
 ![image](https://user-images.githubusercontent.com/12729184/101130013-a5f2f480-363d-11eb-8e1d-1b9851c6e5b2.png)
 
-## The splicing method of wrong SQL strings will cause slow efficiency and memory leaks
+## Wrong SQL string contacting will cause slow efficiency and memory leaks
 
 Here's an important concept used by Dapper. Its `SQL string` is one of the important key values to cache. If different SQL strings are used, Dapper will create new dynamic methods and caches for this, so even if you use StringBuilder improperly `can also cause slow query & memory leaks` .
 
@@ -1199,7 +1192,7 @@ Why the SQL string is used as one of keys, instead of simply using the Handle of
 
 The most direct solution is to establish a different dynamic method for each different SQL string and save it in a different cache.
 
-For example, the following code is just a simple query action, but the number of Dapper Caches has reached 999999, such as Gif animation display
+For example, the following code is just a simple query action, but the number of Dapper Caches has reached 999999, such as image display
 
 ```C#
 using (var cn = new SqlConnection(@"connectionString"))
@@ -1342,9 +1335,9 @@ public  static  class  DbExtension
 }
 ```
 
-After reading the above example, you can find that the underlying principle of Dapper Literal Replacements is `string replace`that it also belongs to the string contacting way. Why can the cache problem be avoided?
+After reading the above example, you can find that the underlying principle of Dapper Literal Replacements is `string replace` that it also belongs to the string contacting way. Why can the cache problem be avoided?
 
-This is because the replacement timing is in the SetParameter dynamic method, so the Cache `SQL Key is unchanged`can reuse the same SQL string and cache.
+This is because the replacement timing is in the SetParameter dynamic method, so the Cache `SQL Key is unchanged` can reuse the same SQL string and cache.
 
 Also because it is a string replace method, `only support basic value type` if you use the String type, the system will inform you `The type String is not supported for SQL literals.`to avoid SQL Injection problems.
 
@@ -1356,7 +1349,7 @@ How to use:
 
 *   You need to write your own Mapping logic and use it: `Query<Func>(SQL,Parameter,Mapping Func)`
 *   Need to specify the generic parameter type, the rule is `Query<Func first type,Func second type,..,Func last type>` (supports up to six sets of generic parameters)
-*   Specify the name of the cutting field `ID` , it is used by default , if it is different, it needs to be specified (specially explained later in this paragraph)
+*   Specify the name of the cutting field `ID` , it is used by default , if it is different, it needs to be specified .
 *   The order is `from left to right`
 
 For example: There is an order (Order) and a member (User) form, the relationship is a one-to-many relationship, a member can have multiple orders, the following is the C# Demo code:
@@ -1474,10 +1467,10 @@ var result = cn.Query<Order,User,Item,Order>(@"
 
 ## Query Multi Mapping underlying principle
 
-First, with a simple Demo.  
+First, a simple Demo.  
 
 1. Create a Mapping FUNC collection corresponding to the number of generic class parameters
-2. The Mapping FUNC setup logic is the same as Query Emit Il
+2. The Mapping FUNC setup logic is the same as Query Emit IL
 3. Call the user's Custom Mapping Func, where the parameters are derived from the previously dynamically generated Mapping Func
 
 ```C#
@@ -1485,12 +1478,12 @@ public static class MutipleMappingDemo
 {
 	public static IEnumerable<TReturn> Query<T1, T2, TReturn>(this IDbConnection connection, string sql, Func<T1, T2, TReturn> map)
 	   where T1 : Order, new()
-	   where T2 : User, new() // These two where is purely for Demo convenience
+	   where T2 : User, new() 
 	{
 		// 1. Create a Mapping FUNC collection corresponding to the number of generic class parameters
 		var deserializers = new List<Func<IDataReader, object>>();
 		{
-			// 2. The Mapping FUNC setup logic is the same as Query Emit Il
+			// 2. The Mapping FUNC setup logic is the same as Query Emit IL
 			deserializers.Add((reader) =>
 		 {
 			 var newObj = new T1();
@@ -1533,7 +1526,7 @@ public static class MutipleMappingDemo
 
 #### Support multiple groups of type + strongly typed return values
 
-Dapper using multiple generic parameter methods for` strongly typed multi-class Mapping` has disadvantage that it can not be dynamically adjusted and needs to be fixed.
+Dapper using multiple generic parameter methods for ` strongly typed multi-class Mapping` has disadvantage that it can not be dynamically adjusted and needs to be fixed.
 
 For example, you can see that the image GenerateMapper method fix the strong transition logic in terms of the number of generic arguments, which is why Multiple Query has a maximum number of groups and can only support up to six.
 
