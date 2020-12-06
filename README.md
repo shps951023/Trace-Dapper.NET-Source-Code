@@ -2,7 +2,7 @@ Trace Dapper.NET Source Code
 ====
 
 English : [Link](https://github.com/shps951023/Trace-Dapper.NET-Source-Code)  
-Traditional Chinese : [Link]([https://github.com/shps951023/Trace-Dapper.NET-Source-Code/blob/master/zh_tw.md](https://github.com/shps951023/Trace-Dapper.NET-Source-Code/blob/master/zh_tw.md))  
+Traditional Chinese : [Link](https://github.com/shps951023/Trace-Dapper.NET-Source-Code/blob/master/zh_tw.md)  
 Simplified Chinese : [Link](https://www.cnblogs.com/ITWeiHan/p/11614704.html)  
 
 
