@@ -1187,7 +1187,7 @@ public static class DemoExtension
 
 ![image](https://user-images.githubusercontent.com/12729184/101130013-a5f2f480-363d-11eb-8e1d-1b9851c6e5b2.png)
 
-## 11. Wrong SQL string contacting will cause slow efficiency and memory leaks
+## 11. Wrong SQL string concating will cause slow efficiency and memory leaks
 
 Here's an important concept used by Dapper. Its `SQL string` is one of the important key values to cache. If different SQL strings are used, Dapper will create new dynamic methods and caches for this, so even if you use StringBuilder improperly `can also cause slow query & memory leaks` .
 
@@ -1235,11 +1235,11 @@ using (var cn = new SqlConnection(@"connectionString"))
 
 ![image](https://user-images.githubusercontent.com/12729184/101131840-e9029700-3640-11eb-8f95-a4d317dc3842.png)
 
-## 12. Dapper SQL correct string contacting method: Literal Replacement
+## 12. Dapper SQL correct string concating method: Literal Replacement
 
-If there is a need to splice SQL strings, for example: Sometimes it is more efficient to use string contacting than not to use parameterization, especially if there are only a few  `fixed values` .
+If there is a need to splice SQL strings, for example: Sometimes it is more efficient to use string concating than not to use parameterization, especially if there are only a few  `fixed values` .
 
-At this time, Dapper can use the `Literal Replacements` function, how to use it: `{=Attribute_Name}` replace the value string to be contacted, and save the value in the Parameter, for example:
+At this time, Dapper can use the `Literal Replacements` function, how to use it: `{=Attribute_Name}` replace the value string to be concated, and save the value in the Parameter, for example:
 
 ```C#
 void Main()
@@ -1342,7 +1342,7 @@ public  static  class  DbExtension
 }
 ```
 
-After reading the above example, you can find that the underlying principle of Dapper Literal Replacements is `string replace` that it also belongs to the string contacting way. Why can the cache problem be avoided?
+After reading the above example, you can find that the underlying principle of Dapper Literal Replacements is `string replace` that it also belongs to the string concating way. Why can the cache problem be avoided?
 
 This is because the replacement timing is in the SetParameter dynamic method, so the Cache `SQL Key is unchanged` can reuse the same SQL string and cache.
 
@@ -2511,6 +2511,6 @@ Finally, I would like to say: the original intention of writing this is to hope 
 3. From the simplest Reflection to the commonly used Expression to the most detailed Emit builds the Mapping method from scratch, taking readers to gradually understand the underlying strong type Mapping logic of Dapper
 4. Understand the important concept of dynamic creation method `"Code Converted From Result"`.
 5. With basic IL capabilities, you can use IL to reverse C# code to understand the underlying Emit logic of other projects
-6. Understand that Dapper `cannot use error strings to contact SQL` because of the algorithm logic of the cache
+6. Understand that Dapper `cannot use error strings to concat SQL` because of the algorithm logic of the cache
 
 Thanks :)
